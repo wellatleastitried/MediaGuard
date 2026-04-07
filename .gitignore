@@ -1,0 +1,13 @@
+.gradle
+.settings/
+build
+gradle/
+MediaGuard/.settings/
+MediaGuard/build/
+MediaGuard/bin/
+MediaGuard/.project/
+.project
+
+.kotlin
+
+.note.xnote
