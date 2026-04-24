@@ -1,0 +1,10 @@
+server:
+  port: ${CLIENT_PORT:8081}
+
+mediaguard:
+  client:
+    state-file: ${CLIENT_STATE_FILE:./data/client/state.json}
+    download-directory: ${CLIENT_DOWNLOAD_DIRECTORY:./data/client/downloads}
+    pickup-interval: ${CLIENT_PICKUP_INTERVAL:PT12H}
+    server-port: ${SERVER_PORT:8080}
+    preferred-server-url: ${MEDIAGUARD_SERVER_URL:}

@@ -11,4 +11,5 @@ plugins {
 }
 
 rootProject.name = "MediaGuard"
-include("MediaGuard")
+include("MediaGuard-Server")
+include("MediaGuard-Client")

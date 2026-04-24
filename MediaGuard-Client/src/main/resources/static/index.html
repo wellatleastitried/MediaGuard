@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediaGuard Client</title>
+  <style>
+    :root {
+      --bg: #f7f4ef;
+      --panel: #fffdf9;
+      --ink: #1c1f26;
+      --muted: #606778;
+      --accent: #0f766e;
+      --accent-strong: #0b5f59;
+      --warn: #9a3412;
+      --border: #ded7cc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "Avenir Next", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 20%, rgba(15,118,110,0.12), transparent 45%),
+        radial-gradient(circle at 80% 10%, rgba(154,52,18,0.10), transparent 40%),
+        var(--bg);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    .shell {
+      max-width: 1024px;
+      margin: 0 auto;
+      display: grid;
+      gap: 1rem;
+      animation: enter 500ms ease;
+    }
+
+    .hero, .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1rem;
+      box-shadow: 0 8px 24px rgba(28,31,38,0.06);
+    }
+
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      letter-spacing: 0.02em;
+    }
+
+    p, small { color: var(--muted); }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    input, button, select {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.55rem 0.75rem;
+      font: inherit;
+    }
+
+    button {
+      background: var(--accent);
+      color: white;
+      border: 0;
+      cursor: pointer;
+      transition: transform 120ms ease, background 180ms ease;
+    }
+
+    button:hover {
+      background: var(--accent-strong);
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background: #e6eceb;
+      color: var(--ink);
+    }
+
+    .grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.5rem;
+      border-bottom: 1px dashed var(--border);
+    }
+
+    .status {
+      padding: 0.25rem 0.5rem;
+      border-radius: 999px;
+      background: #d9f4ef;
+      color: #0c4a44;
+      font-size: 0.85rem;
+    }
+
+    .error {
+      color: var(--warn);
+      min-height: 1.25rem;
+    }
+
+    @keyframes enter {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <h1>MediaGuard Client</h1>
+      <p>Discover a server, trigger backups, update schedules, and pull backup archives manually.</p>
+      <div class="row">
+        <button onclick="discover()">Discover Servers</button>
+        <span class="status" id="activeServer">No server selected</span>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Connection</h2>
+        <div class="row">
+          <select id="serverSelect"></select>
+          <button onclick="setServer()">Use Server</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>Manual Actions</h2>
+        <div class="row">
+          <button onclick="runBackup()">Run Server Backup</button>
+          <button class="secondary" onclick="pickupBackup()">Download Latest</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>Intervals</h2>
+        <div class="row">
+          <input id="intervalMinutes" type="number" min="1" value="720">
+          <button onclick="updateClientInterval()">Client Pickup (min)</button>
+          <button class="secondary" onclick="updateServerInterval()">Server Backup (min)</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>Backups</h2>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>File</th><th>Size</th><th>Created</th></tr>
+        </thead>
+        <tbody id="backupsBody"></tbody>
+      </table>
+      <p class="error" id="errorText"></p>
+    </section>
+  </main>
+
+  <script>
+    async function request(path, options = {}) {
+      const res = await fetch(path, options);
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      const text = await res.text();
+      return text ? JSON.parse(text) : null;
+    }
+
+    function toDuration(minutes) {
+      return `PT${minutes}M`;
+    }
+
+    function setError(message = "") {
+      document.getElementById('errorText').textContent = message;
+    }
+
+    function bytes(n) {
+      if (!n) return '0 B';
+      const units = ['B','KB','MB','GB'];
+      let i = 0, v = n;
+      while (v > 1024 && i < units.length - 1) { v /= 1024; i++; }
+      return `${v.toFixed(1)} ${units[i]}`;
+    }
+
+    async function refreshStatus() {
+      const status = await request('/api/client/status');
+      const label = status.activeServer || 'No server selected';
+      document.getElementById('activeServer').textContent = label;
+      const select = document.getElementById('serverSelect');
+      select.innerHTML = '';
+      status.knownServers.forEach(server => {
+        const option = document.createElement('option');
+        option.value = server;
+        option.textContent = server;
+        if (server === status.activeServer) option.selected = true;
+        select.appendChild(option);
+      });
+      if (status.pickupInterval && /^PT\d+M$/.test(status.pickupInterval)) {
+        document.getElementById('intervalMinutes').value = Number(status.pickupInterval.replace('PT', '').replace('M', ''));
+      }
+    }
+
+    async function refreshBackups() {
+      try {
+        const backups = await request('/api/client/backups');
+        const tbody = document.getElementById('backupsBody');
+        tbody.innerHTML = '';
+        backups.forEach(b => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${b.id}</td><td>${b.fileName}</td><td>${bytes(b.sizeBytes)}</td><td>${b.createdAt}</td>`;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        setError('Unable to fetch backups until an active server is selected.');
+      }
+    }
+
+    async function discover() {
+      try {
+        setError();
+        await request('/api/client/discover', { method: 'POST' });
+        await refreshStatus();
+        await refreshBackups();
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+
+    async function setServer() {
+      try {
+        setError();
+        const server = document.getElementById('serverSelect').value;
+        await request('/api/client/server', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serverUrl: server })
+        });
+        await refreshStatus();
+        await refreshBackups();
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+
+    async function runBackup() {
+      try {
+        setError();
+        await request('/api/client/backups/run', { method: 'POST' });
+        await refreshBackups();
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+
+    async function pickupBackup() {
+      try {
+        setError();
+        await request('/api/client/pickup', { method: 'POST' });
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+
+    async function updateClientInterval() {
+      try {
+        setError();
+        const minutes = Number(document.getElementById('intervalMinutes').value);
+        await request('/api/client/pickup-interval', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interval: toDuration(minutes) })
+        });
+        await refreshStatus();
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+
+    async function updateServerInterval() {
+      try {
+        setError();
+        const minutes = Number(document.getElementById('intervalMinutes').value);
+        await request('/api/client/server-schedule', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interval: toDuration(minutes) })
+        });
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+
+    (async () => {
+      await refreshStatus();
+      await refreshBackups();
+    })();
+  </script>
+</body>
+</html>

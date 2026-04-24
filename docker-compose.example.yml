@@ -1,0 +1,45 @@
+services:
+  mediaguard-server:
+    build:
+      context: .
+      dockerfile: MediaGuard-Server/Dockerfile
+    env_file:
+      - ./secrets/server.env
+    environment:
+      SERVER_PORT: 8080
+      JELLYFIN_ENABLED: ${JELLYFIN_ENABLED}
+      RADARR_ENABLED: ${RADARR_ENABLED}
+      SONARR_ENABLED: ${SONARR_ENABLED}
+      PROWLARR_ENABLED: ${PROWLARR_ENABLED}
+      TDARR_ENABLED: ${TDARR_ENABLED}
+      QBITTORRENT_ENABLED: ${QBITTORRENT_ENABLED}
+      MEDIAGUARD_BACKUP_INTERVAL: ${MEDIAGUARD_BACKUP_INTERVAL}
+      MEDIAGUARD_BACKUP_ROOT: ${MEDIAGUARD_BACKUP_ROOT}
+      MEDIAGUARD_RETENTION_COUNT: ${MEDIAGUARD_RETENTION_COUNT}
+    ports:
+      - "${SERVER_PORT}:8080"
+    volumes:
+      - ${BACKUP_ROOT_HOST_PATH}:/var/lib/mediaguard/backups
+      - ${JELLYFIN_PATH}:/srv/sources/jellyfin:ro
+      - ${RADARR_PATH}:/srv/sources/radarr:ro
+      - ${SONARR_PATH}:/srv/sources/sonarr:ro
+      - ${PROWLARR_PATH}:/srv/sources/prowlarr:ro
+      - ${TDARR_PATH}:/srv/sources/tdarr:ro
+      - ${QBITTORRENT_PATH}:/srv/sources/qbittorrent:ro
+      - ${QBITTORRENT_GRAVEYARD_PATH}:/srv/sources/qbittorrent-graveyard:ro
+    restart: unless-stopped
+
+  mediaguard-client:
+    build:
+      context: .
+      dockerfile: MediaGuard-Client/Dockerfile
+    env_file:
+      - ./secrets/client.env
+    depends_on:
+      - mediaguard-server
+    ports:
+      - "${CLIENT_PORT}:8081"
+    volumes:
+      - ${CLIENT_DOWNLOADS_HOST_PATH}:/var/lib/mediaguard/downloads
+      - ${CLIENT_STATE_HOST_PATH}:/var/lib/mediaguard/client
+    restart: unless-stopped
