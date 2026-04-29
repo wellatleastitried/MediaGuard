@@ -40,7 +40,7 @@ public class BackupOrchestratorService {
         this.scheduleService = scheduleService;
     }
 
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(fixedDelay = 10000)
     public void scheduledRun() {
         if (scheduleService.dueNow()) {
             runBackup();

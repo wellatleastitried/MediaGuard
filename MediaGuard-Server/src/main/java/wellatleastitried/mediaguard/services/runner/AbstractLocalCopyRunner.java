@@ -1,6 +1,7 @@
 package wellatleastitried.mediaguard.services.runner;
 
 import java.io.IOException;
+import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -85,7 +86,7 @@ public abstract class AbstractLocalCopyRunner implements Runner {
     }
 
     private void copyDirectory(Path source, Path target) throws IOException {
-        try (var walk = Files.walk(source)) {
+        try (var walk = Files.walk(source, FileVisitOption.FOLLOW_LINKS)) {
             for (Path path : walk.toList()) {
                 Path relative = source.relativize(path);
                 Path destination = target.resolve(relative);
