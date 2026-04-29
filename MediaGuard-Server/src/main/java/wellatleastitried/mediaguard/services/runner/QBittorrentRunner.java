@@ -1,6 +1,5 @@
 package wellatleastitried.mediaguard.services.runner;
 
-import java.nio.file.Path;
 import java.util.List;
 
 import wellatleastitried.mediaguard.services.config.ServiceConfig;
@@ -16,12 +15,9 @@ public class QBittorrentRunner extends AbstractLocalCopyRunner {
 
     @Override
     protected List<CopySpec> copySpecs() {
-        Path basePath = Path.of(config.getPath());
         return List.of(
-            dir(basePath.resolve("utils").toString(), "utils"),
-            dir(basePath.resolve("config").toString(), "config"),
-            dir(config.getGraveyardPath(), "graveyard"),
-            file(basePath.resolve("docker-compose.yml").toString(), "docker-compose.yml")
+            dir(config.getPath(), "appdata"),
+            dir(config.getGraveyardPath(), "graveyard")
         );
     }
 }

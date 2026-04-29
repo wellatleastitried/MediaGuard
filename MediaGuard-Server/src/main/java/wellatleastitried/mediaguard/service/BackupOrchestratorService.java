@@ -1,6 +1,7 @@
 package wellatleastitried.mediaguard.service;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -8,6 +9,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import wellatleastitried.mediaguard.MediaGuardProperties;
 import wellatleastitried.mediaguard.model.BackupArchive;
@@ -16,6 +19,8 @@ import wellatleastitried.mediaguard.services.runner.Runner;
 
 @Service
 public class BackupOrchestratorService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(BackupOrchestratorService.class);
 
     private final MediaGuardProperties properties;
     private final RunnerFactory runnerFactory;
@@ -50,10 +55,16 @@ public class BackupOrchestratorService {
         Path runDirectory = archiveService.createRunDirectory();
         Instant startedAt = Instant.now();
         List<Runner> runners = runnerFactory.build(properties.getServices());
+        List<String> servicesCompleted = new ArrayList<>();
 
         try {
             for (Runner runner : runners) {
-                runner.run(runDirectory);
+                try {
+                    runner.run(runDirectory);
+                    servicesCompleted.add(runner.getServiceName());
+                } catch (RuntimeException ex) {
+                    LOGGER.warn("Backup runner failed for service {}. Continuing with remaining services.", runner.getServiceName(), ex);
+                }
             }
 
             BackupArchive archive = archiveService.createArchive(runDirectory);
@@ -61,7 +72,7 @@ public class BackupOrchestratorService {
                 archive.id(),
                 startedAt,
                 Instant.now(),
-                runners.stream().map(Runner::getServiceName).toList(),
+                servicesCompleted,
                 archive
             );
         } finally {

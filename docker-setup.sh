@@ -105,7 +105,7 @@ QBITTORRENT_GRAVEYARD_PATH=$qbittorrent_graveyard_path
 EOF_ENV
 
   cat > "$SERVER_ENV_FILE" <<EOF_SERVER
-SERVER_PORT=8080
+SERVER_PORT=$server_port
 MEDIAGUARD_BACKUP_INTERVAL=$backup_interval
 MEDIAGUARD_BACKUP_ROOT=/var/lib/mediaguard/backups
 MEDIAGUARD_RETENTION_COUNT=10
@@ -129,7 +129,7 @@ services:
     env_file:
       - ./secrets/server.env
     ports:
-      - "$server_port:8080"
+      - "$server_port:$server_port"
     volumes:
       - "$backup_root_host:/var/lib/mediaguard/backups"
       - "$jellyfin_path:/srv/sources/jellyfin:ro"
@@ -155,7 +155,7 @@ else
   prompt client_port "MediaGuard-Client host port [8081]: " "8081"
   prompt pickup_interval "Client automatic pickup interval in ISO-8601 format [PT12H]: " "PT12H"
   prompt server_port "MediaGuard-Server host port [38471]: " "38471"
-  prompt preferred_server "Preferred server URL for client [http://mediaguard-server:8080]: " "http://mediaguard-server:8080"
+  prompt preferred_server "Preferred server URL for client [http://mediaguard-server:$server_port]: " "http://mediaguard-server:$server_port"
   prompt client_downloads_host "Client download host path [./data/client/downloads]: " "./data/client/downloads"
   prompt client_state_host "Client state host path [./data/client]: " "./data/client"
 
@@ -170,7 +170,7 @@ EOF_ENV
 
   cat > "$CLIENT_ENV_FILE" <<EOF_CLIENT
 SERVER_PORT=$server_port
-CLIENT_PORT=8081
+CLIENT_PORT=$client_port
 MEDIAGUARD_SERVER_URL=$preferred_server
 CLIENT_PICKUP_INTERVAL=$pickup_interval
 CLIENT_DOWNLOAD_DIRECTORY=/var/lib/mediaguard/downloads
@@ -189,7 +189,7 @@ services:
     env_file:
       - ./secrets/client.env
     ports:
-      - "$client_port:8081"
+      - "$client_port:$client_port"
     volumes:
       - "$client_downloads_host:/var/lib/mediaguard/downloads"
       - "$client_state_host:/var/lib/mediaguard/client"
