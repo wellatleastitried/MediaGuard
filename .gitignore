@@ -14,3 +14,5 @@ secrets/
 .env.*
 !.env.example
 !.env.test.example
+data/
+docker-compose.yml

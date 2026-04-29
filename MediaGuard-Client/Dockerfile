@@ -1,7 +1,7 @@
-FROM eclipse-temurin:21-jdk AS build
+FROM gradle:9.4.0-jdk21 AS build
 WORKDIR /workspace
 COPY . .
-RUN ./gradlew :MediaGuard-Client:bootJar --no-daemon
+RUN gradle :MediaGuard-Client:bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
