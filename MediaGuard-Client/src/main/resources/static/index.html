@@ -200,11 +200,26 @@
       text-transform: uppercase;
       cursor: pointer;
       white-space: nowrap;
-      transition: background 120ms, color 120ms, border-color 120ms;
+      transition: background 120ms, color 120ms, border-color 120ms, transform 70ms, box-shadow 120ms;
     }
 
     button:hover { background: var(--accent-dim); border-color: var(--accent-dim); }
-    button:active { transform: scale(0.98); }
+    button:active {
+      transform: translateY(1px) scale(0.98);
+      box-shadow: inset 0 0 0 2px #000;
+    }
+
+    button.clicked {
+      transform: translateY(1px) scale(0.98);
+      box-shadow: inset 0 0 0 2px #000;
+      filter: brightness(0.94);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.62;
+      transform: none;
+    }
 
     button.ghost {
       background: transparent;
@@ -215,6 +230,40 @@
     button.ghost:hover { border-color: var(--subtle); background: var(--surface-raised); }
 
     button.full { width: 100%; }
+
+    .action-btn {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .action-btn .btn-label {
+      position: relative;
+      z-index: 1;
+    }
+
+    .btn-progress {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 2px;
+      display: none;
+      background: rgba(255, 255, 255, 0.12);
+      overflow: hidden;
+    }
+
+    .action-btn.busy .btn-progress {
+      display: block;
+    }
+
+    .btn-progress::after {
+      content: '';
+      display: block;
+      width: 34%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+      animation: sweep 1.1s linear infinite;
+    }
 
     button.danger {
       background: transparent;
@@ -316,6 +365,25 @@
       color: var(--muted);
       border-bottom: 1px solid var(--border-mid);
     }
+
+    thead th.sortable {
+      cursor: pointer;
+      user-select: none;
+      transition: color 120ms;
+      white-space: nowrap;
+    }
+
+    thead th.sortable:hover { color: var(--accent-dim); }
+
+    .sort-indicator {
+      margin-left: 0.25rem;
+      font-size: 0.65rem;
+      color: var(--subtle);
+      vertical-align: middle;
+    }
+
+    thead th.sortable.active { color: var(--accent-dim); }
+    thead th.sortable.active .sort-indicator { color: var(--accent-dim); }
 
     tbody tr {
       border-bottom: 1px solid var(--border);
@@ -474,8 +542,14 @@
       <div class="panel-body">
         <div class="section-label">Actions</div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-          <button onclick="runBackup()" style="flex:1">Run Backup Now</button>
-          <button class="ghost" onclick="pickupBackup()" style="flex:1">Download Latest</button>
+          <button id="runBackupBtn" class="action-btn" onclick="runBackup()" style="flex:1">
+            <span class="btn-label" id="runBackupBtnLabel">Run Backup Now</span>
+            <span class="btn-progress" aria-hidden="true"></span>
+          </button>
+          <button id="pickupBtn" class="ghost action-btn" onclick="pickupBackup()" style="flex:1">
+            <span class="btn-label" id="pickupBtnLabel">Download Latest</span>
+            <span class="btn-progress" aria-hidden="true"></span>
+          </button>
         </div>
       </div>
 
@@ -505,10 +579,10 @@
       <table>
         <thead>
           <tr>
-            <th>File</th>
-            <th>Size</th>
-            <th>Created</th>
-            <th>ID</th>
+            <th class="sortable active" data-sort-key="fileName">File <span class="sort-indicator">▲</span></th>
+            <th class="sortable" data-sort-key="sizeBytes">Size <span class="sort-indicator">↕</span></th>
+            <th class="sortable" data-sort-key="createdAt">Created <span class="sort-indicator">↕</span></th>
+            <th class="sortable" data-sort-key="id">ID <span class="sort-indicator">↕</span></th>
           </tr>
         </thead>
         <tbody id="backupsBody">
@@ -610,6 +684,7 @@
       const noMsg   = document.getElementById('noServerMsg');
 
       if (connection.connected && connection.serverStatus) {
+        serverBackupRunning = Boolean(connection.serverStatus.running);
         noMsg.style.display = 'none';
         details.style.display = 'block';
         document.getElementById('serverUrlDisplay').textContent = connection.activeServer;
@@ -623,15 +698,19 @@
         }
         setConnBadge('ok', connection.activeServer.replace(/^https?:\/\//, ''));
       } else if (connection.connected) {
+        serverBackupRunning = false;
         noMsg.style.display = 'none';
         details.style.display = 'block';
         document.getElementById('serverUrlDisplay').textContent = connection.activeServer;
         setConnBadge('ok', connection.activeServer.replace(/^https?:\/\//, ''));
       } else {
+        serverBackupRunning = false;
         details.style.display = 'none';
         noMsg.style.display = 'block';
         setConnBadge('', 'Not Connected');
       }
+
+      syncActionButtons();
     }
 
     // ── Data refresh ───────────────────────────────────────────────────────────
@@ -677,29 +756,118 @@
       return null;
     }
 
+    const backupsSort = {
+      key: 'fileName',
+      dir: 'asc'
+    };
+    let backupsCache = [];
+    let serverBackupRunning = false;
+    let runBackupRequestInFlight = false;
+    let pickupRequestInFlight = false;
+
+    function syncActionButtons() {
+      const runBackupBtn = document.getElementById('runBackupBtn');
+      const runBackupBtnLabel = document.getElementById('runBackupBtnLabel');
+      const pickupBtn = document.getElementById('pickupBtn');
+      const pickupBtnLabel = document.getElementById('pickupBtnLabel');
+
+      const backupBusy = serverBackupRunning || runBackupRequestInFlight;
+      runBackupBtn.disabled = backupBusy;
+      runBackupBtn.classList.toggle('busy', backupBusy);
+      runBackupBtnLabel.textContent = backupBusy ? 'Backup In Progress' : 'Run Backup Now';
+
+      pickupBtn.disabled = pickupRequestInFlight;
+      pickupBtn.classList.toggle('busy', pickupRequestInFlight);
+      pickupBtnLabel.textContent = pickupRequestInFlight ? 'Downloading...' : 'Download Latest';
+    }
+
+    function applySort(backups) {
+      const sorted = [...backups];
+      const dirFactor = backupsSort.dir === 'asc' ? 1 : -1;
+
+      sorted.sort((a, b) => {
+        if (backupsSort.key === 'sizeBytes') {
+          return ((a.sizeBytes ?? 0) - (b.sizeBytes ?? 0)) * dirFactor;
+        }
+        if (backupsSort.key === 'createdAt') {
+          return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dirFactor;
+        }
+        const left = String(a[backupsSort.key] ?? '').toLowerCase();
+        const right = String(b[backupsSort.key] ?? '').toLowerCase();
+        return left.localeCompare(right) * dirFactor;
+      });
+
+      return sorted;
+    }
+
+    function renderBackupsTable(backups) {
+      const tbody = document.getElementById('backupsBody');
+      tbody.innerHTML = '';
+
+      if (!backups || backups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No backup archives found on server.</td></tr>';
+        return;
+      }
+
+      applySort(backups).forEach(b => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="td-mono">${b.fileName}</td>
+          <td>${bytes(b.sizeBytes)}</td>
+          <td class="td-muted">${relativeTime(b.createdAt)}</td>
+          <td class="td-mono td-muted" style="font-size:0.7rem">${b.id.slice(0, 22)}…</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateSortHeaderUi() {
+      document.querySelectorAll('thead th.sortable').forEach(th => {
+        const indicator = th.querySelector('.sort-indicator');
+        const isActive = th.dataset.sortKey === backupsSort.key;
+        th.classList.toggle('active', isActive);
+        if (indicator) {
+          indicator.textContent = isActive ? (backupsSort.dir === 'asc' ? '▲' : '▼') : '↕';
+        }
+      });
+    }
+
+    function initBackupsSorting() {
+      document.querySelectorAll('thead th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.dataset.sortKey;
+          if (backupsSort.key === key) {
+            backupsSort.dir = backupsSort.dir === 'asc' ? 'desc' : 'asc';
+          } else {
+            backupsSort.key = key;
+            backupsSort.dir = key === 'createdAt' ? 'desc' : 'asc';
+          }
+          updateSortHeaderUi();
+          renderBackupsTable(backupsCache);
+        });
+      });
+      updateSortHeaderUi();
+    }
+
     async function refreshBackups() {
       try {
         const backups = await request('/api/client/backups');
-        const tbody = document.getElementById('backupsBody');
-        tbody.innerHTML = '';
-        if (!backups || backups.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No backup archives found on server.</td></tr>';
-          return;
-        }
-        backups.forEach(b => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="td-mono">${b.fileName}</td>
-            <td>${bytes(b.sizeBytes)}</td>
-            <td class="td-muted">${relativeTime(b.createdAt)}</td>
-            <td class="td-mono td-muted" style="font-size:0.7rem">${b.id.slice(0, 22)}…</td>`;
-          tbody.appendChild(tr);
-        });
+        backupsCache = Array.isArray(backups) ? backups : [];
+        renderBackupsTable(backupsCache);
         setError();
       } catch (e) {
+        backupsCache = [];
         const tbody = document.getElementById('backupsBody');
         tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Connect to a server to view archives.</td></tr>';
       }
+    }
+
+    function initButtonPressFeedback() {
+      document.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          btn.classList.add('clicked');
+          window.setTimeout(() => btn.classList.remove('clicked'), 140);
+        });
+      });
     }
 
     // ── Actions ────────────────────────────────────────────────────────────────
@@ -774,19 +942,39 @@
     }
 
     async function runBackup() {
+      if (serverBackupRunning || runBackupRequestInFlight) {
+        return;
+      }
       setError();
+      runBackupRequestInFlight = true;
+      syncActionButtons();
       try {
         await request('/api/client/backups/run', { method: 'POST' });
         await refreshBackups();
         await refreshConnectionHealth();
       } catch (e) { setError(e.message); }
+      finally {
+        runBackupRequestInFlight = false;
+        await refreshConnectionHealth();
+        syncActionButtons();
+      }
     }
 
     async function pickupBackup() {
+      if (pickupRequestInFlight) {
+        return;
+      }
       setError();
+      pickupRequestInFlight = true;
+      syncActionButtons();
       try {
         await request('/api/client/pickup', { method: 'POST' });
+        await refreshBackups();
       } catch (e) { setError(e.message); }
+      finally {
+        pickupRequestInFlight = false;
+        syncActionButtons();
+      }
     }
 
     async function updateClientInterval() {
@@ -816,8 +1004,14 @@
 
     // ── Init ───────────────────────────────────────────────────────────────────
     (async () => {
+      initBackupsSorting();
+      initButtonPressFeedback();
+      syncActionButtons();
       await refreshStatus();
       await refreshBackups();
+      window.setInterval(() => {
+        refreshConnectionHealth();
+      }, 7000);
     })();
   </script>
 </body>
