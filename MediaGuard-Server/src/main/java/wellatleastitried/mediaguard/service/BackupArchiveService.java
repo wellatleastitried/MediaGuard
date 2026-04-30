@@ -17,6 +17,8 @@ import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import jakarta.annotation.PostConstruct;
+
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +38,47 @@ public class BackupArchiveService {
 
     public BackupArchiveService(MediaGuardProperties properties) {
         this.properties = properties;
+    }
+
+    @PostConstruct
+    public void cleanupStaleArtifactsOnStartup() {
+        Path root = rootDirectory();
+        Path runsRoot = root.resolve("runs");
+
+        try {
+            Files.createDirectories(root);
+
+            try (var stream = Files.list(root)) {
+                stream
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(".zip.tmp"))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                            LOGGER.info("Startup cleanup: removed stale temporary archive {}", path.getFileName());
+                        } catch (IOException e) {
+                            LOGGER.warn("Startup cleanup: failed to remove stale temporary archive {}", path, e);
+                        }
+                    });
+            }
+
+            if (Files.exists(runsRoot)) {
+                try (var stream = Files.list(runsRoot)) {
+                    stream
+                        .filter(Files::isDirectory)
+                        .forEach(runDir -> {
+                            try {
+                                removeRunDirectory(runDir);
+                                LOGGER.info("Startup cleanup: removed stale run directory {}", runDir.getFileName());
+                            } catch (RuntimeException e) {
+                                LOGGER.warn("Startup cleanup: failed to remove stale run directory {}", runDir, e);
+                            }
+                        });
+                }
+            }
+        } catch (IOException e) {
+            LOGGER.warn("Startup cleanup: unable to initialize backup root {}", root, e);
+        }
     }
 
     public Path rootDirectory() {
