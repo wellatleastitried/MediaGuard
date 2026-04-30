@@ -112,6 +112,16 @@
       font-size: 0.85rem;
     }
 
+    .status.info {
+      background: #e6eceb;
+      color: #24303a;
+    }
+
+    .status.warn {
+      background: #fde9dd;
+      color: #7c2d12;
+    }
+
     .error {
       color: var(--warn);
       min-height: 1.25rem;
@@ -127,10 +137,11 @@
   <main class="shell">
     <section class="hero">
       <h1>MediaGuard Client</h1>
-      <p>Discover a server, trigger backups, update schedules, and pull backup archives manually.</p>
+      <p>Connect to your MediaGuard server, run backups, and download backup archives.</p>
       <div class="row">
-        <button onclick="discover()">Discover Servers</button>
+        <button onclick="discover()">Scan Local Network For Servers</button>
         <span class="status" id="activeServer">No server selected</span>
+        <span class="status info" id="connectionStatus">Idle</span>
       </div>
     </section>
 
@@ -138,16 +149,21 @@
       <article class="card">
         <h2>Connection</h2>
         <div class="row">
+          <input id="serverIp" type="text" placeholder="Server IP (e.g. 192.168.1.20)">
+          <button onclick="setServerByIp()">Connect Using Server IP</button>
+        </div>
+        <p><small id="resolvedPort">Last resolved server port: unknown</small></p>
+        <div class="row">
           <select id="serverSelect"></select>
-          <button onclick="setServer()">Use Server</button>
+          <button onclick="setServer()">Connect To Selected Server</button>
         </div>
       </article>
 
       <article class="card">
         <h2>Manual Actions</h2>
         <div class="row">
-          <button onclick="runBackup()">Run Server Backup</button>
-          <button class="secondary" onclick="pickupBackup()">Download Latest</button>
+          <button onclick="runBackup()">Start Backup On Server Now</button>
+          <button class="secondary" onclick="pickupBackup()">Download Latest Backup To Client</button>
         </div>
       </article>
 
@@ -155,8 +171,8 @@
         <h2>Intervals</h2>
         <div class="row">
           <input id="intervalMinutes" type="number" min="1" value="720">
-          <button onclick="updateClientInterval()">Client Pickup (min)</button>
-          <button class="secondary" onclick="updateServerInterval()">Server Backup (min)</button>
+          <button onclick="updateClientInterval()">Set Client Download Interval (minutes)</button>
+          <button class="secondary" onclick="updateServerInterval()">Set Server Backup Interval (minutes)</button>
         </div>
       </article>
     </section>
@@ -191,6 +207,27 @@
       document.getElementById('errorText').textContent = message;
     }
 
+    function setConnectionStatus(message, variant = 'info') {
+      const badge = document.getElementById('connectionStatus');
+      badge.textContent = message;
+      badge.className = `status ${variant}`;
+    }
+
+    function setResolvedPortLabel(serverUrl) {
+      const label = document.getElementById('resolvedPort');
+      if (!serverUrl) {
+        label.textContent = 'Last resolved server port: unknown';
+        return;
+      }
+      try {
+        const parsed = new URL(serverUrl);
+        const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
+        label.textContent = `Last resolved server port: ${port}`;
+      } catch {
+        label.textContent = 'Last resolved server port: unknown';
+      }
+    }
+
     function bytes(n) {
       if (!n) return '0 B';
       const units = ['B','KB','MB','GB'];
@@ -203,6 +240,12 @@
       const status = await request('/api/client/status');
       const label = status.activeServer || 'No server selected';
       document.getElementById('activeServer').textContent = label;
+      setResolvedPortLabel(status.activeServer);
+      if (status.activeServer) {
+        setConnectionStatus(`Connected: ${status.activeServer}`, 'info');
+      } else {
+        setConnectionStatus('Idle', 'info');
+      }
       const select = document.getElementById('serverSelect');
       select.innerHTML = '';
       status.knownServers.forEach(server => {
@@ -235,10 +278,12 @@
     async function discover() {
       try {
         setError();
+        setConnectionStatus('Scanning local network...', 'info');
         await request('/api/client/discover', { method: 'POST' });
         await refreshStatus();
         await refreshBackups();
       } catch (e) {
+        setConnectionStatus('Network scan failed', 'warn');
         setError(e.message);
       }
     }
@@ -247,6 +292,11 @@
       try {
         setError();
         const server = document.getElementById('serverSelect').value;
+        if (!server) {
+          setError('No server selected. Use Discover or enter a server IP.');
+          return;
+        }
+        setConnectionStatus(`Connecting to ${server}...`, 'info');
         await request('/api/client/server', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -255,6 +305,29 @@
         await refreshStatus();
         await refreshBackups();
       } catch (e) {
+        setConnectionStatus('Connection failed', 'warn');
+        setError(e.message);
+      }
+    }
+
+    async function setServerByIp() {
+      try {
+        setError();
+        const serverIp = document.getElementById('serverIp').value.trim();
+        if (!serverIp) {
+          setError('Enter a server IP address.');
+          return;
+        }
+        setConnectionStatus(`Probing ports on ${serverIp}...`, 'info');
+        await request('/api/client/server', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serverIp })
+        });
+        await refreshStatus();
+        await refreshBackups();
+      } catch (e) {
+        setConnectionStatus('Could not find server on provided IP', 'warn');
         setError(e.message);
       }
     }

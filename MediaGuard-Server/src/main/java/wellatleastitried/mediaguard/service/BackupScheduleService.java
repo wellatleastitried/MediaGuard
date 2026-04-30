@@ -34,11 +34,11 @@ public class BackupScheduleService {
     public boolean dueNow() {
         Instant now = Instant.now();
         Instant current = nextRun.get();
-        if (now.isBefore(current)) {
-            return false;
-        }
-        nextRun.set(now.plus(currentInterval.get()));
-        return true;
+        return !now.isBefore(current);
+    }
+
+    public void markRunStarted() {
+        nextRun.set(Instant.now().plus(currentInterval.get()));
     }
 
     private Duration safe(Duration interval) {

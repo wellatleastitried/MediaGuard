@@ -154,24 +154,23 @@ EOF_COMPOSE
 else
   prompt client_port "MediaGuard-Client host port [8081]: " "8081"
   prompt pickup_interval "Client automatic pickup interval in ISO-8601 format [PT12H]: " "PT12H"
-  prompt server_port "MediaGuard-Server host port [38471]: " "38471"
-  prompt preferred_server "Preferred server URL for client [http://mediaguard-server:$server_port]: " "http://mediaguard-server:$server_port"
+  prompt server_host "MediaGuard-Server IP/hostname [mediaguard-server]: " "mediaguard-server"
   prompt client_downloads_host "Client download host path [./data/client/downloads]: " "./data/client/downloads"
   prompt client_state_host "Client state host path [./data/client]: " "./data/client"
 
   cat > "$ENV_FILE" <<EOF_ENV
 CLIENT_PORT=$client_port
 CLIENT_PICKUP_INTERVAL=$pickup_interval
-SERVER_PORT=$server_port
-MEDIAGUARD_SERVER_URL=$preferred_server
+MEDIAGUARD_SERVER_PORT=38471
+MEDIAGUARD_SERVER_HOST=$server_host
 CLIENT_DOWNLOADS_HOST_PATH=$client_downloads_host
 CLIENT_STATE_HOST_PATH=$client_state_host
 EOF_ENV
 
   cat > "$CLIENT_ENV_FILE" <<EOF_CLIENT
-SERVER_PORT=$server_port
+MEDIAGUARD_SERVER_PORT=38471
+MEDIAGUARD_SERVER_HOST=$server_host
 CLIENT_PORT=$client_port
-MEDIAGUARD_SERVER_URL=$preferred_server
 CLIENT_PICKUP_INTERVAL=$pickup_interval
 CLIENT_DOWNLOAD_DIRECTORY=/var/lib/mediaguard/downloads
 CLIENT_STATE_FILE=/var/lib/mediaguard/client/state.json

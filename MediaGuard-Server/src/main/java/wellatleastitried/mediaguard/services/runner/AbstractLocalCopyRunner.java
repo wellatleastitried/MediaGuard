@@ -1,10 +1,13 @@
 package wellatleastitried.mediaguard.services.runner;
 
 import java.io.IOException;
-import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Locale;
 
@@ -37,7 +40,11 @@ public abstract class AbstractLocalCopyRunner implements Runner {
         }
 
         for (CopySpec spec : copySpecs()) {
-            copySpec(spec, serviceDirectory);
+            try {
+                copySpec(spec, serviceDirectory);
+            } catch (RuntimeException ex) {
+                LOGGER.warn("{} runner failed for {} source {}. Continuing with remaining specs.", serviceName, spec.targetName(), spec.sourcePath(), ex);
+            }
         }
     }
 
@@ -86,23 +93,37 @@ public abstract class AbstractLocalCopyRunner implements Runner {
     }
 
     private void copyDirectory(Path source, Path target) throws IOException {
-        try (var walk = Files.walk(source, FileVisitOption.FOLLOW_LINKS)) {
-            for (Path path : walk.toList()) {
-                Path relative = source.relativize(path);
+        Files.createDirectories(target);
+        FileVisitor<Path> visitor = new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                Path relative = source.relativize(dir);
                 Path destination = target.resolve(relative);
-                if (Files.isDirectory(path)) {
-                    Files.createDirectories(destination);
-                    LOGGER.info("{} runner found directory: {}", serviceName, destination);
-                    continue;
-                }
+                Files.createDirectories(destination);
+                LOGGER.info("{} runner found directory: {}", serviceName, destination);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Path relative = source.relativize(file);
+                Path destination = target.resolve(relative);
                 Path parent = destination.getParent();
                 if (parent != null) {
                     Files.createDirectories(parent);
                 }
-                Files.copy(path, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
                 LOGGER.info("{} runner found file: {}", serviceName, destination);
+                return FileVisitResult.CONTINUE;
             }
-        }
+
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                LOGGER.warn("{} runner failed to read {}. Continuing.", serviceName, file, exc);
+                return FileVisitResult.CONTINUE;
+            }
+        };
+        Files.walkFileTree(source, visitor);
     }
 
     protected record CopySpec(String sourcePath, String targetName, boolean directory) {

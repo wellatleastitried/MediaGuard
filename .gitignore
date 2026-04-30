@@ -13,6 +13,6 @@ secrets/
 .env
 .env.*
 !.env.example
-!.env.test.example
+.env.test.example
 data/
 docker-compose.yml

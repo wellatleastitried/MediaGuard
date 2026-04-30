@@ -27,8 +27,9 @@ public class ClientStateService {
     public ClientStateService(Configuration configuration) {
         this.configuration = configuration;
         this.pickupInterval = safe(configuration.getPickupInterval());
-        this.activeServer = configuration.getPreferredServerUrl();
+        this.activeServer = normalize(configuration.getPreferredServerUrl());
         load();
+        applyPreferredServerOverride();
     }
 
     public synchronized String getActiveServer() {
@@ -85,7 +86,30 @@ public class ClientStateService {
 
             knownServers.clear();
             parseKnownServers(json).forEach(knownServers::add);
+            if ((activeServer == null || activeServer.isBlank()) && !knownServers.isEmpty()) {
+                activeServer = knownServers.getFirst();
+            }
         } catch (IOException ignored) {
+        }
+    }
+
+    private void applyPreferredServerOverride() {
+        String preferred = normalize(configuration.getPreferredServerUrl());
+        if (preferred == null) {
+            return;
+        }
+
+        boolean changed = false;
+        if (!preferred.equals(activeServer)) {
+            activeServer = preferred;
+            changed = true;
+        }
+        if (!knownServers.contains(preferred)) {
+            knownServers.add(preferred);
+            changed = true;
+        }
+        if (changed) {
+            save();
         }
     }
 
@@ -148,5 +172,13 @@ public class ClientStateService {
 
     private String nullSafe(String value) {
         return value == null ? "" : value;
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

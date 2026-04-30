@@ -5,7 +5,13 @@ import java.util.ArrayList;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import jakarta.annotation.PreDestroy;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -27,6 +33,7 @@ public class BackupOrchestratorService {
     private final BackupArchiveService archiveService;
     private final BackupScheduleService scheduleService;
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final ExecutorService runnerExecutor = Executors.newCachedThreadPool();
 
     public BackupOrchestratorService(
         MediaGuardProperties properties,
@@ -42,8 +49,16 @@ public class BackupOrchestratorService {
 
     @Scheduled(fixedDelay = 10000)
     public void scheduledRun() {
-        if (scheduleService.dueNow()) {
+        if (running.get()) {
+            return;
+        }
+        if (!scheduleService.dueNow()) {
+            return;
+        }
+        try {
             runBackup();
+        } catch (RuntimeException ex) {
+            LOGGER.error("Scheduled backup run failed", ex);
         }
     }
 
@@ -52,18 +67,30 @@ public class BackupOrchestratorService {
             throw new IllegalStateException("A backup run is already in progress");
         }
 
+        scheduleService.markRunStarted();
+
         Path runDirectory = archiveService.createRunDirectory();
         Instant startedAt = Instant.now();
         List<Runner> runners = runnerFactory.build(properties.getServices());
         List<String> servicesCompleted = new ArrayList<>();
 
         try {
+            List<Future<RunnerOutcome>> futures = new ArrayList<>();
             for (Runner runner : runners) {
+                futures.add(runnerExecutor.submit(() -> runSingleRunner(runner, runDirectory)));
+            }
+
+            for (Future<RunnerOutcome> future : futures) {
                 try {
-                    runner.run(runDirectory);
-                    servicesCompleted.add(runner.getServiceName());
-                } catch (RuntimeException ex) {
-                    LOGGER.warn("Backup runner failed for service {}. Continuing with remaining services.", runner.getServiceName(), ex);
+                    RunnerOutcome outcome = future.get();
+                    if (outcome.success()) {
+                        servicesCompleted.add(outcome.serviceName());
+                    }
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Backup run interrupted", ex);
+                } catch (ExecutionException ex) {
+                    LOGGER.warn("Unexpected failure while waiting for runner task", ex.getCause());
                 }
             }
 
@@ -91,5 +118,23 @@ public class BackupOrchestratorService {
 
     public Duration updateInterval(Duration duration) {
         return scheduleService.updateInterval(duration);
+    }
+
+    @PreDestroy
+    public void shutdownRunnerExecutor() {
+        runnerExecutor.shutdownNow();
+    }
+
+    private RunnerOutcome runSingleRunner(Runner runner, Path runDirectory) {
+        try {
+            runner.run(runDirectory);
+            return new RunnerOutcome(runner.getServiceName(), true);
+        } catch (RuntimeException ex) {
+            LOGGER.warn("Backup runner failed for service {}. Continuing with remaining services.", runner.getServiceName(), ex);
+            return new RunnerOutcome(runner.getServiceName(), false);
+        }
+    }
+
+    private record RunnerOutcome(String serviceName, boolean success) {
     }
 }
