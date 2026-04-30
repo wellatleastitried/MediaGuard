@@ -1,0 +1,12 @@
+.git
+.github
+.vscode
+build
+**/build
+**/.gradle
+.gradle
+data
+secrets
+**/tmp
+**/out
+*.log

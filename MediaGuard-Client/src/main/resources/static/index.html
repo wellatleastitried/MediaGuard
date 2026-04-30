@@ -1,0 +1,1201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediaGuard Client</title>
+  <style>
+    :root {
+      --bg: #000;
+      --surface: #0a0a0a;
+      --surface-raised: #111;
+      --ink: #f5f5f5;
+      --muted: #737373;
+      --subtle: #404040;
+      --border: #1f1f1f;
+      --border-mid: #2e2e2e;
+      --accent: #f5f5f5;
+      --accent-dim: #d4d4d4;
+      --ok: #22c55e;
+      --warn: #ef4444;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Space Grotesk", "Inter", "Avenir Next", ui-sans-serif, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .brand-title {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+
+    .brand-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    .conn-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.32rem 0.75rem;
+      border: 1px solid var(--border-mid);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      background: var(--surface-raised);
+      white-space: nowrap;
+    }
+
+    .conn-badge .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--subtle);
+      flex-shrink: 0;
+      transition: background 300ms;
+    }
+
+    .conn-badge.ok { color: #a3e8bc; border-color: #1e3b2a; }
+    .conn-badge.ok .dot { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+    .conn-badge.checking { color: var(--accent-dim); border-color: var(--border-mid); }
+    .conn-badge.checking .dot { background: #a3a3a3; }
+
+    /* ── MAIN LAYOUT ── */
+    .workspace {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      grid-template-rows: auto 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 900px) {
+      .workspace { grid-template-columns: 1fr; }
+    }
+
+    /* ── CARDS ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent-dim);
+    }
+
+    .panel-body {
+      padding: 1rem;
+    }
+
+    .panel-body + .panel-body {
+      border-top: 1px solid var(--border);
+    }
+
+    .section-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.6rem;
+    }
+
+    /* ── INPUTS & BUTTONS ── */
+    input, select {
+      width: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      border: 1px solid var(--border-mid);
+      padding: 0.5rem 0.65rem;
+      font: inherit;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 150ms;
+    }
+
+    input:focus, select:focus { border-color: var(--subtle); }
+    input::placeholder { color: var(--muted); }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.5rem;
+    }
+
+    .input-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 110px;
+      gap: 0.5rem;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .field-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    button {
+      background: var(--accent);
+      color: #000;
+      border: 1px solid var(--accent);
+      padding: 0.5rem 0.85rem;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 120ms, color 120ms, border-color 120ms, transform 70ms, box-shadow 120ms;
+    }
+
+    button:hover { background: var(--accent-dim); border-color: var(--accent-dim); }
+    button:active {
+      transform: translateY(1px) scale(0.98);
+      box-shadow: inset 0 0 0 2px #000;
+    }
+
+    button.clicked {
+      transform: translateY(1px) scale(0.98);
+      box-shadow: inset 0 0 0 2px #000;
+      filter: brightness(0.94);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.62;
+      transform: none;
+    }
+
+    button.ghost {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--border-mid);
+    }
+
+    button.ghost:hover { border-color: var(--subtle); background: var(--surface-raised); }
+
+    button.full { width: 100%; }
+
+    .action-btn {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .action-btn .btn-label {
+      position: relative;
+      z-index: 1;
+    }
+
+    .btn-progress {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 2px;
+      display: none;
+      background: rgba(255, 255, 255, 0.12);
+      overflow: hidden;
+    }
+
+    .action-btn.busy .btn-progress {
+      display: block;
+    }
+
+    .btn-progress.indeterminate::after {
+      content: '';
+      display: block;
+      width: 34%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+      animation: sweep 1.1s linear infinite;
+    }
+
+    .btn-progress-fill {
+      display: block;
+      width: 0;
+      height: 100%;
+      background: linear-gradient(90deg, #9ca3af, #f5f5f5);
+      transition: width 120ms linear;
+    }
+
+    button.danger {
+      background: transparent;
+      color: #fca5a5;
+      border-color: #3b1111;
+    }
+
+    button.danger:hover { background: #1c0606; }
+
+    /* ── DIVIDER ── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0.75rem 0;
+    }
+
+    /* ── STATUS ROWS ── */
+    .stat-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.83rem;
+    }
+
+    .stat-row:last-child { border-bottom: none; }
+
+    .stat-key {
+      color: var(--muted);
+      font-size: 0.75rem;
+      letter-spacing: 0.03em;
+    }
+
+    .stat-val {
+      color: var(--ink);
+      font-weight: 600;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 0.12rem 0.45rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      border: 1px solid var(--border-mid);
+      color: var(--muted);
+    }
+
+    .tag.running { color: #a3e8bc; border-color: #1e3b2a; }
+    .tag.idle { color: var(--muted); border-color: var(--border-mid); }
+
+    /* ── SCAN PROGRESS ── */
+    .scan-bar {
+      display: none;
+      height: 2px;
+      background: var(--border);
+      overflow: hidden;
+      margin-top: 0.6rem;
+    }
+
+    .scan-bar.active { display: block; }
+
+    .scan-bar > span {
+      display: block;
+      width: 30%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, var(--accent-dim), transparent);
+      animation: sweep 1.1s linear infinite;
+    }
+
+    .scan-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.45rem;
+    }
+
+    /* ── BACKUPS TABLE ── */
+    .backups-panel {
+      grid-column: 1 / -1;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    thead th {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border-mid);
+    }
+
+    thead th.sortable {
+      cursor: pointer;
+      user-select: none;
+      transition: color 120ms;
+      white-space: nowrap;
+    }
+
+    thead th.sortable:hover { color: var(--accent-dim); }
+
+    .sort-indicator {
+      margin-left: 0.25rem;
+      font-size: 0.65rem;
+      color: var(--subtle);
+      vertical-align: middle;
+    }
+
+    thead th.sortable.active { color: var(--accent-dim); }
+    thead th.sortable.active .sort-indicator { color: var(--accent-dim); }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 100ms;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface-raised); }
+
+    tbody td {
+      padding: 0.55rem 0.75rem;
+      color: var(--ink);
+      vertical-align: middle;
+    }
+
+    .td-mono {
+      font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      font-size: 0.78rem;
+      color: var(--accent-dim);
+    }
+
+    .td-muted { color: var(--muted); }
+
+    .actions-cell {
+      width: 58px;
+      text-align: right;
+    }
+
+    .icon-btn {
+      min-width: 34px;
+      height: 28px;
+      padding: 0;
+      font-size: 0.95rem;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .row-progress-circle {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: inline-block;
+      position: relative;
+      background: conic-gradient(var(--accent-dim) var(--p, 0%), var(--border-mid) 0);
+    }
+
+    .row-progress-circle::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: var(--surface);
+    }
+
+    .empty-state {
+      padding: 2.5rem 1rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.83rem;
+    }
+
+    /* ── SERVER URL DISPLAY ── */
+    .server-url {
+      font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      font-size: 0.78rem;
+      color: var(--accent-dim);
+      word-break: break-all;
+      padding: 0.4rem 0.6rem;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      margin-bottom: 0.75rem;
+    }
+
+    .no-server-msg {
+      font-size: 0.82rem;
+      color: var(--muted);
+      padding: 1rem 0;
+      text-align: center;
+    }
+
+    /* ── ERROR BANNER ── */
+    .error-banner {
+      display: none;
+      grid-column: 1 / -1;
+      padding: 0.65rem 1rem;
+      background: #1c0606;
+      border: 1px solid #3b1111;
+      color: #fca5a5;
+      font-size: 0.82rem;
+    }
+
+    .error-banner.visible { display: block; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes sweep {
+      from { transform: translateX(-150%); }
+      to   { transform: translateX(420%); }
+    }
+
+    @keyframes fadein {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .workspace { animation: fadein 350ms ease; }
+  </style>
+</head>
+<body>
+
+  <!-- ── TOP BAR ── -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-title">MediaGuard</span>
+      <span class="brand-sub">Client Dashboard</span>
+    </div>
+    <div class="conn-badge" id="connBadge">
+      <span class="dot"></span>
+      <span id="connLabel">Connecting...</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+
+    <!-- ── LEFT COLUMN: CONNECT ── -->
+    <section class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Server Connection</span>
+      </div>
+
+      <!-- IP Connect -->
+      <div class="panel-body">
+        <div class="section-label">Connect by IP</div>
+        <div class="field-group">
+          <div class="input-row-2">
+            <input id="serverIp" type="text" placeholder="192.168.1.x">
+            <input id="serverPort" type="number" min="1" max="65535" placeholder="Port">
+          </div>
+        </div>
+        <button class="full" onclick="setServerByIp()">Connect to IP</button>
+      </div>
+
+      <!-- Known Servers -->
+      <div class="panel-body">
+        <div class="section-label">Known Servers</div>
+        <div class="field-group">
+          <select id="serverSelect"><option value="">— none discovered yet —</option></select>
+        </div>
+        <button class="full ghost" onclick="setServer()">Connect to Selected</button>
+      </div>
+
+      <!-- Discovery -->
+      <div class="panel-body">
+        <div class="section-label">Network Discovery</div>
+        <button class="full ghost" onclick="discover()">Scan Local Network</button>
+        <div class="scan-bar" id="scanBar" aria-hidden="true"><span></span></div>
+        <p class="scan-note" id="scanNote">Last scan: not run yet.</p>
+      </div>
+    </section>
+
+    <!-- ── RIGHT COLUMN: STATUS + ACTIONS ── -->
+    <section class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Server Status</span>
+      </div>
+
+      <!-- Connected view -->
+      <div class="panel-body" id="serverInfoBlock">
+        <div class="no-server-msg" id="noServerMsg">No server connected.</div>
+        <div id="serverDetails" style="display:none">
+          <div class="server-url" id="serverUrlDisplay"></div>
+          <div class="stat-row">
+            <span class="stat-key">Backup Interval</span>
+            <span class="stat-val" id="statInterval">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-key">Retention</span>
+            <span class="stat-val" id="statRetention">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-key">State</span>
+            <span class="stat-val"><span class="tag idle" id="statRunning">IDLE</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="panel-body">
+        <div class="section-label">Actions</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button id="runBackupBtn" class="action-btn" onclick="runBackup()" style="flex:1">
+            <span class="btn-label" id="runBackupBtnLabel">Run Backup Now</span>
+            <span class="btn-progress indeterminate" aria-hidden="true"></span>
+          </button>
+          <button id="pickupBtn" class="ghost action-btn" onclick="pickupBackup()" style="flex:1">
+            <span class="btn-label" id="pickupBtnLabel">Download Latest</span>
+            <span class="btn-progress" aria-hidden="true"><span class="btn-progress-fill" id="pickupBtnProgressFill"></span></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Schedule -->
+      <div class="panel-body">
+        <div class="section-label">Schedule Interval</div>
+        <div class="field-group">
+          <label class="field-label" for="intervalMinutes">Minutes</label>
+          <input id="intervalMinutes" type="number" min="1" value="720">
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button class="ghost" onclick="updateClientInterval()" style="flex:1">Set Client Interval</button>
+          <button class="ghost" onclick="updateServerInterval()" style="flex:1">Set Server Interval</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ERROR BANNER ── -->
+    <div class="error-banner" id="errorBanner"></div>
+
+    <!-- ── BACKUPS TABLE ── -->
+    <section class="panel backups-panel">
+      <div class="panel-header">
+        <span class="panel-title">Backup Archives</span>
+        <button class="ghost" onclick="refreshBackups()" style="padding:0.3rem 0.65rem;font-size:0.7rem">Refresh</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable active" data-sort-key="fileName">File <span class="sort-indicator">▲</span></th>
+            <th class="sortable" data-sort-key="sizeBytes">Size <span class="sort-indicator">↕</span></th>
+            <th class="sortable" data-sort-key="createdAt">Created <span class="sort-indicator">↕</span></th>
+            <th class="sortable" data-sort-key="id">ID <span class="sort-indicator">↕</span></th>
+            <th class="actions-cell">Get</th>
+          </tr>
+        </thead>
+        <tbody id="backupsBody">
+          <tr><td colspan="5" class="empty-state">No backups loaded. Connect to a server to view archives.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+
+  <script>
+    // ── Utilities ──────────────────────────────────────────────────────────────
+
+    async function request(path, options = {}) {
+      const res = await fetch(path, options);
+      if (!res.ok) {
+        const text = await res.text();
+        let parsed = null;
+        try { parsed = JSON.parse(text); } catch {}
+        const msg = parsed?.message?.trim() || parsed?.error?.trim() || text || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      const text = await res.text();
+      return text ? JSON.parse(text) : null;
+    }
+
+    function toDuration(minutes) { return `PT${minutes}M`; }
+
+    function bytes(n) {
+      if (!n) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let i = 0, v = n;
+      while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+      return `${v.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+    }
+
+    function relativeTime(isoString) {
+      const diff = Date.now() - new Date(isoString).getTime();
+      const s = Math.floor(diff / 1000);
+      if (s < 60) return `${s}s ago`;
+      const m = Math.floor(s / 60);
+      if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h}h ago`;
+      return `${Math.floor(h / 24)}d ago`;
+    }
+
+    function formatInterval(isoStr) {
+      if (!isoStr) return '—';
+      // Handle Duration serialized as seconds number or as PT string
+      if (typeof isoStr === 'number') {
+        const h = Math.floor(isoStr / 3600);
+        const m = Math.floor((isoStr % 3600) / 60);
+        return h > 0 ? `${h}h ${m > 0 ? m + 'm' : ''}`.trim() : `${m}m`;
+      }
+      const str = String(isoStr).toUpperCase().replace('PT', '');
+      const hMatch = str.match(/(\d+)H/); const mMatch = str.match(/(\d+)M/); const sMatch = str.match(/(\d+)S/);
+      const parts = [];
+      if (hMatch) parts.push(`${hMatch[1]}h`);
+      if (mMatch) parts.push(`${mMatch[1]}m`);
+      if (sMatch && !hMatch && !mMatch) parts.push(`${sMatch[1]}s`);
+      return parts.join(' ') || isoStr;
+    }
+
+    // ── Error display ──────────────────────────────────────────────────────────
+
+    function setError(message = '') {
+      const banner = document.getElementById('errorBanner');
+      if (message) {
+        banner.textContent = message;
+        banner.classList.add('visible');
+      } else {
+        banner.classList.remove('visible');
+      }
+    }
+
+    // ── Scan progress ──────────────────────────────────────────────────────────
+
+    function setScanActive(active) {
+      document.getElementById('scanBar').classList.toggle('active', active);
+    }
+
+    function setScanNote(msg) {
+      document.getElementById('scanNote').textContent = msg;
+    }
+
+    // ── Connection badge ───────────────────────────────────────────────────────
+
+    function setConnBadge(state, label) {
+      const badge = document.getElementById('connBadge');
+      badge.className = 'conn-badge ' + (state || '');
+      document.getElementById('connLabel').textContent = label;
+    }
+
+    // ── Server status panel ────────────────────────────────────────────────────
+
+    function updateServerPanel(connection) {
+      const details = document.getElementById('serverDetails');
+      const noMsg   = document.getElementById('noServerMsg');
+
+      if (connection.connected && connection.serverStatus) {
+        serverBackupRunning = Boolean(connection.serverStatus.running);
+        noMsg.style.display = 'none';
+        details.style.display = 'block';
+        document.getElementById('serverUrlDisplay').textContent = connection.activeServer;
+        document.getElementById('statInterval').textContent  = formatInterval(connection.serverStatus.backupInterval);
+        document.getElementById('statRetention').textContent = connection.serverStatus.backupRetentionCount + ' archives';
+        const runTag = document.getElementById('statRunning');
+        if (connection.serverStatus.running) {
+          runTag.textContent = 'RUNNING'; runTag.className = 'tag running';
+        } else {
+          runTag.textContent = 'IDLE'; runTag.className = 'tag idle';
+        }
+        setConnBadge('ok', connection.activeServer.replace(/^https?:\/\//, ''));
+      } else if (connection.connected) {
+        serverBackupRunning = false;
+        noMsg.style.display = 'none';
+        details.style.display = 'block';
+        document.getElementById('serverUrlDisplay').textContent = connection.activeServer;
+        setConnBadge('ok', connection.activeServer.replace(/^https?:\/\//, ''));
+      } else {
+        serverBackupRunning = false;
+        details.style.display = 'none';
+        noMsg.style.display = 'block';
+        setConnBadge('', 'Not Connected');
+      }
+
+      syncActionButtons();
+    }
+
+    // ── Data refresh ───────────────────────────────────────────────────────────
+
+    async function refreshConnectionHealth() {
+      try {
+        const connection = await request('/api/client/server-health');
+        updateServerPanel(connection);
+      } catch {
+        updateServerPanel({ connected: false });
+      }
+    }
+
+    async function refreshStatus() {
+      const status = await request('/api/client/status');
+      const select = document.getElementById('serverSelect');
+      select.innerHTML = '';
+      if (!status.knownServers || status.knownServers.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = ''; opt.textContent = '— none discovered yet —';
+        select.appendChild(opt);
+      } else {
+        status.knownServers.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s; opt.textContent = s;
+          if (s === status.activeServer) opt.selected = true;
+          select.appendChild(opt);
+        });
+      }
+      if (status.pickupInterval) {
+        const mins = parseIntervalMinutes(status.pickupInterval);
+        if (mins) document.getElementById('intervalMinutes').value = mins;
+      }
+      await refreshConnectionHealth();
+    }
+
+    function parseIntervalMinutes(interval) {
+      if (typeof interval === 'number') return Math.floor(interval / 60);
+      const str = String(interval).toUpperCase();
+      const h = str.match(/(\d+)H/); const m = str.match(/(\d+)M/);
+      if (h) return parseInt(h[1]) * 60 + (m ? parseInt(m[1]) : 0);
+      if (m) return parseInt(m[1]);
+      return null;
+    }
+
+    const backupsSort = {
+      key: 'fileName',
+      dir: 'asc'
+    };
+    let backupsCache = [];
+    let serverBackupRunning = false;
+    let runBackupRequestInFlight = false;
+    let pickupRequestInFlight = false;
+    let pickupTaskPollTimer = null;
+    let latestPickupTask = null;
+    const rowPickupTasks = new Map();
+
+    function rowButtonId(backupId) {
+      return `row-dl-${String(backupId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    }
+
+    function progressPercent(bytesWritten, totalBytes) {
+      if (!totalBytes || totalBytes <= 0) {
+        return 0;
+      }
+      return Math.max(0, Math.min(100, Math.floor((bytesWritten / totalBytes) * 100)));
+    }
+
+    function rowDownloadMarkup(backupId) {
+      const state = rowPickupTasks.get(backupId);
+      if (!state) {
+        return '↓';
+      }
+      const pct = progressPercent(state.bytesWritten, state.totalBytes);
+      return `<span class="row-progress-circle" style="--p:${pct}%" title="${pct}%"></span>`;
+    }
+
+    function updateRowDownloadButton(backupId) {
+      const btn = document.getElementById(rowButtonId(backupId));
+      if (!btn) {
+        return;
+      }
+      const state = rowPickupTasks.get(backupId);
+      btn.disabled = Boolean(state);
+      btn.innerHTML = rowDownloadMarkup(backupId);
+      if (!state) {
+        btn.title = 'Download this backup';
+      }
+    }
+
+    function syncActionButtons() {
+      const runBackupBtn = document.getElementById('runBackupBtn');
+      const runBackupBtnLabel = document.getElementById('runBackupBtnLabel');
+      const pickupBtn = document.getElementById('pickupBtn');
+      const pickupBtnLabel = document.getElementById('pickupBtnLabel');
+      const pickupBtnProgressFill = document.getElementById('pickupBtnProgressFill');
+
+      const backupBusy = serverBackupRunning || runBackupRequestInFlight;
+      runBackupBtn.disabled = backupBusy;
+      runBackupBtn.classList.toggle('busy', backupBusy);
+      runBackupBtnLabel.textContent = backupBusy ? 'Backup In Progress' : 'Run Backup Now';
+
+      pickupBtn.disabled = pickupRequestInFlight;
+      pickupBtn.classList.toggle('busy', pickupRequestInFlight);
+      pickupBtnLabel.textContent = pickupRequestInFlight ? 'Downloading...' : 'Download Latest';
+      const pickupPct = latestPickupTask ? progressPercent(latestPickupTask.bytesWritten, latestPickupTask.totalBytes) : 0;
+      pickupBtnProgressFill.style.width = `${pickupPct}%`;
+    }
+
+    function applySort(backups) {
+      const sorted = [...backups];
+      const dirFactor = backupsSort.dir === 'asc' ? 1 : -1;
+
+      sorted.sort((a, b) => {
+        if (backupsSort.key === 'sizeBytes') {
+          return ((a.sizeBytes ?? 0) - (b.sizeBytes ?? 0)) * dirFactor;
+        }
+        if (backupsSort.key === 'createdAt') {
+          return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dirFactor;
+        }
+        const left = String(a[backupsSort.key] ?? '').toLowerCase();
+        const right = String(b[backupsSort.key] ?? '').toLowerCase();
+        return left.localeCompare(right) * dirFactor;
+      });
+
+      return sorted;
+    }
+
+    function renderBackupsTable(backups) {
+      const tbody = document.getElementById('backupsBody');
+      tbody.innerHTML = '';
+
+      if (!backups || backups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No backup archives found on server.</td></tr>';
+        return;
+      }
+
+      applySort(backups).forEach(b => {
+        const tr = document.createElement('tr');
+        const buttonId = rowButtonId(b.id);
+        tr.innerHTML = `
+          <td class="td-mono">${b.fileName}</td>
+          <td>${bytes(b.sizeBytes)}</td>
+          <td class="td-muted">${relativeTime(b.createdAt)}</td>
+          <td class="td-mono td-muted" style="font-size:0.7rem">${b.id.slice(0, 22)}…</td>
+          <td class="actions-cell"><button id="${buttonId}" class="ghost icon-btn" title="Download this backup" onclick="pickupBackupById('${b.id}')">${rowDownloadMarkup(b.id)}</button></td>`;
+        tbody.appendChild(tr);
+        updateRowDownloadButton(b.id);
+      });
+    }
+
+    function startPickupTaskPolling() {
+      if (pickupTaskPollTimer) {
+        return;
+      }
+
+      pickupTaskPollTimer = window.setInterval(async () => {
+        const taskIds = [];
+        if (latestPickupTask?.taskId) {
+          taskIds.push({ taskId: latestPickupTask.taskId, kind: 'latest', backupId: latestPickupTask.backupId });
+        }
+        rowPickupTasks.forEach((state, backupId) => {
+          taskIds.push({ taskId: state.taskId, kind: 'row', backupId });
+        });
+
+        if (taskIds.length === 0) {
+          return;
+        }
+
+        for (const task of taskIds) {
+          try {
+            const progress = await request(`/api/client/pickup/progress/${encodeURIComponent(task.taskId)}`);
+            if (task.kind === 'latest' && latestPickupTask && latestPickupTask.taskId === task.taskId) {
+              latestPickupTask.bytesWritten = progress.bytesWritten || 0;
+              latestPickupTask.totalBytes = progress.totalBytes || latestPickupTask.totalBytes || 0;
+              if (progress.status === 'COMPLETED') {
+                pickupRequestInFlight = false;
+                latestPickupTask = null;
+                await refreshBackups();
+              } else if (progress.status === 'FAILED') {
+                pickupRequestInFlight = false;
+                setError(progress.error || 'Download failed');
+                latestPickupTask = null;
+              }
+              syncActionButtons();
+            }
+
+            if (task.kind === 'row') {
+              const state = rowPickupTasks.get(task.backupId);
+              if (!state || state.taskId !== task.taskId) {
+                continue;
+              }
+
+              state.bytesWritten = progress.bytesWritten || 0;
+              state.totalBytes = progress.totalBytes || state.totalBytes || 0;
+              updateRowDownloadButton(task.backupId);
+
+              if (progress.status === 'COMPLETED') {
+                rowPickupTasks.delete(task.backupId);
+                updateRowDownloadButton(task.backupId);
+              } else if (progress.status === 'FAILED') {
+                rowPickupTasks.delete(task.backupId);
+                setError(progress.error || 'Download failed');
+                updateRowDownloadButton(task.backupId);
+              }
+            }
+          } catch (e) {
+            if (task.kind === 'latest') {
+              pickupRequestInFlight = false;
+              latestPickupTask = null;
+              syncActionButtons();
+            }
+            if (task.kind === 'row') {
+              rowPickupTasks.delete(task.backupId);
+              updateRowDownloadButton(task.backupId);
+            }
+          }
+        }
+      }, 350);
+    }
+
+    function updateSortHeaderUi() {
+      document.querySelectorAll('thead th.sortable').forEach(th => {
+        const indicator = th.querySelector('.sort-indicator');
+        const isActive = th.dataset.sortKey === backupsSort.key;
+        th.classList.toggle('active', isActive);
+        if (indicator) {
+          indicator.textContent = isActive ? (backupsSort.dir === 'asc' ? '▲' : '▼') : '↕';
+        }
+      });
+    }
+
+    function initBackupsSorting() {
+      document.querySelectorAll('thead th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.dataset.sortKey;
+          if (backupsSort.key === key) {
+            backupsSort.dir = backupsSort.dir === 'asc' ? 'desc' : 'asc';
+          } else {
+            backupsSort.key = key;
+            backupsSort.dir = key === 'createdAt' ? 'desc' : 'asc';
+          }
+          updateSortHeaderUi();
+          renderBackupsTable(backupsCache);
+        });
+      });
+      updateSortHeaderUi();
+    }
+
+    async function refreshBackups() {
+      try {
+        const backups = await request('/api/client/backups');
+        backupsCache = Array.isArray(backups) ? backups : [];
+        renderBackupsTable(backupsCache);
+        setError();
+      } catch (e) {
+        backupsCache = [];
+        const tbody = document.getElementById('backupsBody');
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Connect to a server to view archives.</td></tr>';
+      }
+    }
+
+    function initButtonPressFeedback() {
+      document.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          btn.classList.add('clicked');
+          window.setTimeout(() => btn.classList.remove('clicked'), 140);
+        });
+      });
+    }
+
+    // ── Actions ────────────────────────────────────────────────────────────────
+
+    async function discover() {
+      setError();
+      setConnBadge('checking', 'Scanning...');
+      setScanNote('Scan in progress…');
+      setScanActive(true);
+      try {
+        const status = await request('/api/client/discover', { method: 'POST' });
+        const count = Array.isArray(status.knownServers) ? status.knownServers.length : 0;
+        setScanNote(`Last scan: found ${count} server${count === 1 ? '' : 's'}.`);
+        await refreshStatus();
+        await refreshBackups();
+      } catch (e) {
+        setScanNote('Last scan: failed.');
+        setError(e.message);
+        setConnBadge('', 'Not Connected');
+      } finally {
+        setScanActive(false);
+      }
+    }
+
+    async function setServer() {
+      setError();
+      const server = document.getElementById('serverSelect').value;
+      if (!server) { setError('No server selected.'); return; }
+      setConnBadge('checking', 'Connecting…');
+      setScanActive(true);
+      try {
+        await request('/api/client/server', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serverUrl: server })
+        });
+        await refreshStatus();
+        await refreshBackups();
+      } catch (e) {
+        setError(e.message);
+        setConnBadge('', 'Not Connected');
+      } finally {
+        setScanActive(false);
+      }
+    }
+
+    async function setServerByIp() {
+      setError();
+      const ip = document.getElementById('serverIp').value.trim();
+      const portStr = document.getElementById('serverPort').value.trim();
+      if (!ip) { setError('Enter a server IP address.'); return; }
+      const port = portStr ? Number(portStr) : null;
+      if (portStr && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+        setError('Port must be 1–65535.'); return;
+      }
+      setConnBadge('checking', 'Probing…');
+      setScanActive(true);
+      try {
+        await request('/api/client/server', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serverIp: ip, serverPort: port })
+        });
+        await refreshStatus();
+        await refreshBackups();
+      } catch (e) {
+        setError(e.message);
+        setConnBadge('', 'Not Connected');
+      } finally {
+        setScanActive(false);
+      }
+    }
+
+    async function runBackup() {
+      if (serverBackupRunning || runBackupRequestInFlight) {
+        return;
+      }
+      setError();
+      runBackupRequestInFlight = true;
+      syncActionButtons();
+      try {
+        await request('/api/client/backups/run', { method: 'POST' });
+        await refreshBackups();
+        await refreshConnectionHealth();
+      } catch (e) { setError(e.message); }
+      finally {
+        runBackupRequestInFlight = false;
+        await refreshConnectionHealth();
+        syncActionButtons();
+      }
+    }
+
+    async function pickupBackup() {
+      if (pickupRequestInFlight) {
+        return;
+      }
+      setError();
+      pickupRequestInFlight = true;
+      latestPickupTask = { taskId: null, backupId: null, bytesWritten: 0, totalBytes: 0 };
+      syncActionButtons();
+      try {
+        const started = await request('/api/client/pickup', { method: 'POST' });
+        latestPickupTask = {
+          taskId: started.taskId,
+          backupId: started.backupId,
+          bytesWritten: 0,
+          totalBytes: started.totalBytes || 0
+        };
+        startPickupTaskPolling();
+      } catch (e) { setError(e.message); }
+      finally {
+        if (!latestPickupTask || !latestPickupTask.taskId) {
+          pickupRequestInFlight = false;
+          latestPickupTask = null;
+          syncActionButtons();
+        }
+      }
+    }
+
+    async function pickupBackupById(id) {
+      setError();
+      if (rowPickupTasks.has(id)) {
+        return;
+      }
+      try {
+        const started = await request(`/api/client/pickup/${encodeURIComponent(id)}`, { method: 'POST' });
+        rowPickupTasks.set(id, {
+          taskId: started.taskId,
+          bytesWritten: 0,
+          totalBytes: started.totalBytes || 0
+        });
+        updateRowDownloadButton(id);
+        startPickupTaskPolling();
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+
+    async function updateClientInterval() {
+      setError();
+      try {
+        const minutes = Number(document.getElementById('intervalMinutes').value);
+        await request('/api/client/pickup-interval', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interval: toDuration(minutes) })
+        });
+      } catch (e) { setError(e.message); }
+    }
+
+    async function updateServerInterval() {
+      setError();
+      try {
+        const minutes = Number(document.getElementById('intervalMinutes').value);
+        await request('/api/client/server-schedule', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interval: toDuration(minutes) })
+        });
+        await refreshConnectionHealth();
+      } catch (e) { setError(e.message); }
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    (async () => {
+      initBackupsSorting();
+      initButtonPressFeedback();
+      syncActionButtons();
+      await refreshStatus();
+      await refreshBackups();
+      window.setInterval(() => {
+        refreshConnectionHealth();
+      }, 7000);
+    })();
+  </script>
+</body>
+</html>

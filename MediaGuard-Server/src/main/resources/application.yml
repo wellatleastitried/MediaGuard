@@ -1,0 +1,27 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+mediaguard:
+  backup-interval: ${MEDIAGUARD_BACKUP_INTERVAL:PT12H}
+  backup-root: ${MEDIAGUARD_BACKUP_ROOT:./data/server/backups}
+  retention-count: ${MEDIAGUARD_RETENTION_COUNT:10}
+  services:
+    jellyfin:
+      enabled: ${JELLYFIN_ENABLED:true}
+      config-path: /srv/sources/jellyfin/config
+    radarr:
+      enabled: ${RADARR_ENABLED:true}
+      path: /srv/sources/radarr
+    sonarr:
+      enabled: ${SONARR_ENABLED:true}
+      path: /srv/sources/sonarr
+    prowlarr:
+      enabled: ${PROWLARR_ENABLED:true}
+      path: /srv/sources/prowlarr
+    tdarr:
+      enabled: ${TDARR_ENABLED:true}
+      path: /srv/sources/tdarr
+    qbittorrent:
+      enabled: ${QBITTORRENT_ENABLED:true}
+      path: /srv/sources/qbittorrent
+      graveyard-path: /srv/sources/qbittorrent-graveyard
