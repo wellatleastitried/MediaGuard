@@ -76,8 +76,13 @@ public class BackupArchiveService {
                         });
                 }
             }
+
+            enforceRetention();
+            LOGGER.info("Startup cleanup: retention policy enforced");
         } catch (IOException e) {
             LOGGER.warn("Startup cleanup: unable to initialize backup root {}", root, e);
+        } catch (RuntimeException e) {
+            LOGGER.warn("Startup cleanup: failed while enforcing retention policy", e);
         }
     }
 
