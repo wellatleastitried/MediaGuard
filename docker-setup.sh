@@ -71,6 +71,7 @@ if [[ "$setup_server" == "true" ]]; then
   prompt server_port "MediaGuard-Server host port [38471]: " "38471"
   prompt backup_interval "Server automatic backup interval in ISO-8601 format [PT12H]: " "PT12H"
   prompt backup_root_host "Server backup host path [./data/server/backups]: " "./data/server/backups"
+  prompt backup_retention "Maximum number of backups to keep [10]: " "10"
 
   yes_no jellyfin_enabled "Enable Jellyfin backups? [Y/n]: " "y"
   prompt jellyfin_path "Jellyfin source base directory [/mnt/appdata/jellyfin]: " "/mnt/appdata/jellyfin"
@@ -95,6 +96,7 @@ if [[ "$setup_server" == "true" ]]; then
 SERVER_PORT=$server_port
 MEDIAGUARD_BACKUP_INTERVAL=$backup_interval
 BACKUP_ROOT_HOST_PATH=$backup_root_host
+MEDIAGUARD_RETENTION_COUNT=$backup_retention
 JELLYFIN_PATH=$jellyfin_path
 RADARR_PATH=$radarr_path
 SONARR_PATH=$sonarr_path
@@ -108,7 +110,7 @@ EOF_ENV
 SERVER_PORT=$server_port
 MEDIAGUARD_BACKUP_INTERVAL=$backup_interval
 MEDIAGUARD_BACKUP_ROOT=/var/lib/mediaguard/backups
-MEDIAGUARD_RETENTION_COUNT=10
+MEDIAGUARD_RETENTION_COUNT=$backup_retention
 JELLYFIN_ENABLED=$jellyfin_enabled
 RADARR_ENABLED=$radarr_enabled
 SONARR_ENABLED=$sonarr_enabled
