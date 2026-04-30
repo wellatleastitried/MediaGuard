@@ -50,13 +50,13 @@ public class BackupOrchestratorService {
     @Scheduled(fixedDelay = 10000)
     public void scheduledRun() {
         if (running.get()) {
-            LOGGER.debug("Scheduled check skipped — backup already in progress");
+            LOGGER.debug("Scheduled check skipped, backup already in progress");
             return;
         }
         if (!scheduleService.dueNow()) {
             return;
         }
-        LOGGER.info("Scheduled backup triggered — next run at {}", scheduleService.getNextRun());
+        LOGGER.info("Scheduled backup triggered, next run at {}", scheduleService.getNextRun());
         try {
             runBackup();
         } catch (RuntimeException ex) {
@@ -66,7 +66,7 @@ public class BackupOrchestratorService {
 
     public BackupRunResult runBackup() {
         if (!running.compareAndSet(false, true)) {
-            LOGGER.warn("runBackup() called while backup already in progress — rejecting");
+            LOGGER.warn("runBackup() called while backup already in progress, rejecting");
             throw new IllegalStateException("A backup run is already in progress");
         }
 
@@ -77,7 +77,7 @@ public class BackupOrchestratorService {
         List<Runner> runners = runnerFactory.build(properties.getServices());
         List<String> servicesCompleted = new ArrayList<>();
 
-        LOGGER.info("Backup run started — runDir={}, services={}", runDirectory, runners.stream().map(Runner::getServiceName).toList());
+        LOGGER.info("Backup run started: runDir={}, services={}", runDirectory, runners.stream().map(Runner::getServiceName).toList());
 
         try {
             List<Future<RunnerOutcome>> futures = new ArrayList<>();
@@ -103,10 +103,10 @@ public class BackupOrchestratorService {
                 }
             }
 
-            LOGGER.info("All runners finished — succeeded={}/{}", servicesCompleted.size(), runners.size());
+            LOGGER.info("All runners finished: succeeded={}/{}", servicesCompleted.size(), runners.size());
             BackupArchive archive = archiveService.createArchive(runDirectory);
             long durationMs = Instant.now().toEpochMilli() - startedAt.toEpochMilli();
-            LOGGER.info("Backup run complete — archive={}, size={}B, duration={}ms, services={}",
+            LOGGER.info("Backup run complete: archive={}, size={}B, duration={}ms, services={}",
                 archive.fileName(), archive.sizeBytes(), durationMs, servicesCompleted);
             return new BackupRunResult(
                 archive.id(),
@@ -147,7 +147,7 @@ public class BackupOrchestratorService {
             LOGGER.info("[{}] Runner finished in {}ms", runner.getServiceName(), System.currentTimeMillis() - start);
             return new RunnerOutcome(runner.getServiceName(), true);
         } catch (RuntimeException ex) {
-            LOGGER.warn("[{}] Runner failed after {}ms — continuing with remaining services",
+            LOGGER.error("[{}] Runner failed after {}ms, continuing with remaining services",
                 runner.getServiceName(), System.currentTimeMillis() - start, ex);
             return new RunnerOutcome(runner.getServiceName(), false);
         }

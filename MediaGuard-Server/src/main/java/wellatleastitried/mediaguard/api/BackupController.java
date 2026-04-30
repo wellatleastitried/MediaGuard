@@ -55,7 +55,7 @@ public class BackupController {
 
     @GetMapping("/health")
     public ServerStatusDto health() {
-        LOGGER.info("GET /api/v1/health — running={}, interval={}", orchestratorService.isRunning(), orchestratorService.getInterval());
+        LOGGER.info("GET /api/v1/health, running={}, interval={}", orchestratorService.isRunning(), orchestratorService.getInterval());
         return new ServerStatusDto(
             true,
             orchestratorService.isRunning(),
@@ -66,9 +66,9 @@ public class BackupController {
 
     @PutMapping("/schedule")
     public ServerStatusDto updateSchedule(@RequestBody ScheduleUpdateRequest request) {
-        LOGGER.info("PUT /api/v1/schedule — requestedInterval={}", request.backupInterval());
+        LOGGER.info("PUT /api/v1/schedule, requestedInterval={}", request.backupInterval());
         Duration updated = orchestratorService.updateInterval(request.backupInterval());
-        LOGGER.info("Schedule updated — newInterval={}", updated);
+        LOGGER.info("Schedule updated: newInterval={}", updated);
         return new ServerStatusDto(
             true,
             orchestratorService.isRunning(),
@@ -88,9 +88,10 @@ public class BackupController {
     @GetMapping("/backups/latest")
     public BackupDto latestBackup() {
         LOGGER.info("GET /api/v1/backups/latest");
-        return archiveService.latest()
-            .map(a -> { LOGGER.info("Latest backup: {}", a.fileName()); return toDto(a); })
-            .orElseThrow(() -> { LOGGER.warn("No backup archives found"); return new ResponseStatusException(HttpStatus.NOT_FOUND, "No backup archives found"); });
+        BackupArchive archive = archiveService.latest()
+            .orElseThrow(() -> notFound("No backup archives found"));
+        LOGGER.info("Latest backup: {}", archive.fileName());
+        return toDto(archive);
     }
 
     @GetMapping("/backups/{id}")
@@ -98,14 +99,14 @@ public class BackupController {
         LOGGER.info("GET /api/v1/backups/{}", id);
         return archiveService.byId(id)
             .map(this::toDto)
-            .orElseThrow(() -> { LOGGER.warn("Backup not found: {}", id); return new ResponseStatusException(HttpStatus.NOT_FOUND, "Backup not found"); });
+            .orElseThrow(() -> notFound("Backup not found: " + id, "Backup not found"));
     }
 
     @GetMapping("/backups/{id}/download")
     public ResponseEntity<Resource> downloadById(@PathVariable String id) {
         LOGGER.info("GET /api/v1/backups/{}/download", id);
         BackupArchive archive = archiveService.byId(id)
-            .orElseThrow(() -> { LOGGER.warn("Download requested for missing backup: {}", id); return new ResponseStatusException(HttpStatus.NOT_FOUND, "Backup not found"); });
+            .orElseThrow(() -> notFound("Download requested for missing backup: " + id, "Backup not found"));
         return downloadResponse(archive);
     }
 
@@ -113,7 +114,7 @@ public class BackupController {
     public ResponseEntity<Resource> downloadLatest() {
         LOGGER.info("GET /api/v1/backups/latest/download");
         BackupArchive archive = archiveService.latest()
-            .orElseThrow(() -> { LOGGER.warn("Download requested but no archives exist"); return new ResponseStatusException(HttpStatus.NOT_FOUND, "No backup archives found"); });
+            .orElseThrow(() -> notFound("Download requested but no archives exist", "No backup archives found"));
         return downloadResponse(archive);
     }
 
@@ -122,7 +123,7 @@ public class BackupController {
         LOGGER.info("DELETE /api/v1/backups/{}", id);
         boolean deleted = archiveService.deleteById(id);
         if (!deleted) {
-            LOGGER.warn("Delete failed — backup not found: {}", id);
+            LOGGER.warn("Delete failed: backup not found: {}", id);
             return ResponseEntity.notFound().build();
         }
         LOGGER.info("Backup deleted: {}", id);
@@ -131,9 +132,9 @@ public class BackupController {
 
     @PostMapping("/backups/run")
     public BackupRunDto runBackup() {
-        LOGGER.info("POST /api/v1/backups/run — triggering manual backup");
+        LOGGER.info("POST /api/v1/backups/run, triggering manual backup");
         BackupRunResult result = orchestratorService.runBackup();
-        LOGGER.info("Manual backup complete — runId={}, services={}, archive={}, duration={}ms",
+        LOGGER.info("Manual backup complete: runId={}, services={}, archive={}, duration={}ms",
             result.runId(), result.servicesRan(), result.archive().fileName(),
             result.finishedAt().toEpochMilli() - result.startedAt().toEpochMilli());
         return new BackupRunDto(
@@ -167,5 +168,14 @@ public class BackupController {
 
     private BackupDto toDto(BackupArchive archive) {
         return new BackupDto(archive.id(), archive.fileName(), archive.sizeBytes(), archive.createdAt());
+    }
+
+    private ResponseStatusException notFound(String logMessage) {
+        return notFound(logMessage, logMessage);
+    }
+
+    private ResponseStatusException notFound(String logMessage, String responseMessage) {
+        LOGGER.warn(logMessage);
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, responseMessage);
     }
 }

@@ -256,13 +256,21 @@
       display: block;
     }
 
-    .btn-progress::after {
+    .btn-progress.indeterminate::after {
       content: '';
       display: block;
       width: 34%;
       height: 100%;
       background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
       animation: sweep 1.1s linear infinite;
+    }
+
+    .btn-progress-fill {
+      display: block;
+      width: 0;
+      height: 100%;
+      background: linear-gradient(90deg, #9ca3af, #f5f5f5);
+      transition: width 120ms linear;
     }
 
     button.danger {
@@ -407,6 +415,39 @@
 
     .td-muted { color: var(--muted); }
 
+    .actions-cell {
+      width: 58px;
+      text-align: right;
+    }
+
+    .icon-btn {
+      min-width: 34px;
+      height: 28px;
+      padding: 0;
+      font-size: 0.95rem;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .row-progress-circle {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: inline-block;
+      position: relative;
+      background: conic-gradient(var(--accent-dim) var(--p, 0%), var(--border-mid) 0);
+    }
+
+    .row-progress-circle::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: var(--surface);
+    }
+
     .empty-state {
       padding: 2.5rem 1rem;
       text-align: center;
@@ -544,11 +585,11 @@
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
           <button id="runBackupBtn" class="action-btn" onclick="runBackup()" style="flex:1">
             <span class="btn-label" id="runBackupBtnLabel">Run Backup Now</span>
-            <span class="btn-progress" aria-hidden="true"></span>
+            <span class="btn-progress indeterminate" aria-hidden="true"></span>
           </button>
           <button id="pickupBtn" class="ghost action-btn" onclick="pickupBackup()" style="flex:1">
             <span class="btn-label" id="pickupBtnLabel">Download Latest</span>
-            <span class="btn-progress" aria-hidden="true"></span>
+            <span class="btn-progress" aria-hidden="true"><span class="btn-progress-fill" id="pickupBtnProgressFill"></span></span>
           </button>
         </div>
       </div>
@@ -583,10 +624,11 @@
             <th class="sortable" data-sort-key="sizeBytes">Size <span class="sort-indicator">↕</span></th>
             <th class="sortable" data-sort-key="createdAt">Created <span class="sort-indicator">↕</span></th>
             <th class="sortable" data-sort-key="id">ID <span class="sort-indicator">↕</span></th>
+            <th class="actions-cell">Get</th>
           </tr>
         </thead>
         <tbody id="backupsBody">
-          <tr><td colspan="4" class="empty-state">No backups loaded. Connect to a server to view archives.</td></tr>
+          <tr><td colspan="5" class="empty-state">No backups loaded. Connect to a server to view archives.</td></tr>
         </tbody>
       </table>
     </section>
@@ -764,12 +806,49 @@
     let serverBackupRunning = false;
     let runBackupRequestInFlight = false;
     let pickupRequestInFlight = false;
+    let pickupTaskPollTimer = null;
+    let latestPickupTask = null;
+    const rowPickupTasks = new Map();
+
+    function rowButtonId(backupId) {
+      return `row-dl-${String(backupId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    }
+
+    function progressPercent(bytesWritten, totalBytes) {
+      if (!totalBytes || totalBytes <= 0) {
+        return 0;
+      }
+      return Math.max(0, Math.min(100, Math.floor((bytesWritten / totalBytes) * 100)));
+    }
+
+    function rowDownloadMarkup(backupId) {
+      const state = rowPickupTasks.get(backupId);
+      if (!state) {
+        return '↓';
+      }
+      const pct = progressPercent(state.bytesWritten, state.totalBytes);
+      return `<span class="row-progress-circle" style="--p:${pct}%" title="${pct}%"></span>`;
+    }
+
+    function updateRowDownloadButton(backupId) {
+      const btn = document.getElementById(rowButtonId(backupId));
+      if (!btn) {
+        return;
+      }
+      const state = rowPickupTasks.get(backupId);
+      btn.disabled = Boolean(state);
+      btn.innerHTML = rowDownloadMarkup(backupId);
+      if (!state) {
+        btn.title = 'Download this backup';
+      }
+    }
 
     function syncActionButtons() {
       const runBackupBtn = document.getElementById('runBackupBtn');
       const runBackupBtnLabel = document.getElementById('runBackupBtnLabel');
       const pickupBtn = document.getElementById('pickupBtn');
       const pickupBtnLabel = document.getElementById('pickupBtnLabel');
+      const pickupBtnProgressFill = document.getElementById('pickupBtnProgressFill');
 
       const backupBusy = serverBackupRunning || runBackupRequestInFlight;
       runBackupBtn.disabled = backupBusy;
@@ -779,6 +858,8 @@
       pickupBtn.disabled = pickupRequestInFlight;
       pickupBtn.classList.toggle('busy', pickupRequestInFlight);
       pickupBtnLabel.textContent = pickupRequestInFlight ? 'Downloading...' : 'Download Latest';
+      const pickupPct = latestPickupTask ? progressPercent(latestPickupTask.bytesWritten, latestPickupTask.totalBytes) : 0;
+      pickupBtnProgressFill.style.width = `${pickupPct}%`;
     }
 
     function applySort(backups) {
@@ -805,19 +886,92 @@
       tbody.innerHTML = '';
 
       if (!backups || backups.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No backup archives found on server.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No backup archives found on server.</td></tr>';
         return;
       }
 
       applySort(backups).forEach(b => {
         const tr = document.createElement('tr');
+        const buttonId = rowButtonId(b.id);
         tr.innerHTML = `
           <td class="td-mono">${b.fileName}</td>
           <td>${bytes(b.sizeBytes)}</td>
           <td class="td-muted">${relativeTime(b.createdAt)}</td>
-          <td class="td-mono td-muted" style="font-size:0.7rem">${b.id.slice(0, 22)}…</td>`;
+          <td class="td-mono td-muted" style="font-size:0.7rem">${b.id.slice(0, 22)}…</td>
+          <td class="actions-cell"><button id="${buttonId}" class="ghost icon-btn" title="Download this backup" onclick="pickupBackupById('${b.id}')">${rowDownloadMarkup(b.id)}</button></td>`;
         tbody.appendChild(tr);
+        updateRowDownloadButton(b.id);
       });
+    }
+
+    function startPickupTaskPolling() {
+      if (pickupTaskPollTimer) {
+        return;
+      }
+
+      pickupTaskPollTimer = window.setInterval(async () => {
+        const taskIds = [];
+        if (latestPickupTask?.taskId) {
+          taskIds.push({ taskId: latestPickupTask.taskId, kind: 'latest', backupId: latestPickupTask.backupId });
+        }
+        rowPickupTasks.forEach((state, backupId) => {
+          taskIds.push({ taskId: state.taskId, kind: 'row', backupId });
+        });
+
+        if (taskIds.length === 0) {
+          return;
+        }
+
+        for (const task of taskIds) {
+          try {
+            const progress = await request(`/api/client/pickup/progress/${encodeURIComponent(task.taskId)}`);
+            if (task.kind === 'latest' && latestPickupTask && latestPickupTask.taskId === task.taskId) {
+              latestPickupTask.bytesWritten = progress.bytesWritten || 0;
+              latestPickupTask.totalBytes = progress.totalBytes || latestPickupTask.totalBytes || 0;
+              if (progress.status === 'COMPLETED') {
+                pickupRequestInFlight = false;
+                latestPickupTask = null;
+                await refreshBackups();
+              } else if (progress.status === 'FAILED') {
+                pickupRequestInFlight = false;
+                setError(progress.error || 'Download failed');
+                latestPickupTask = null;
+              }
+              syncActionButtons();
+            }
+
+            if (task.kind === 'row') {
+              const state = rowPickupTasks.get(task.backupId);
+              if (!state || state.taskId !== task.taskId) {
+                continue;
+              }
+
+              state.bytesWritten = progress.bytesWritten || 0;
+              state.totalBytes = progress.totalBytes || state.totalBytes || 0;
+              updateRowDownloadButton(task.backupId);
+
+              if (progress.status === 'COMPLETED') {
+                rowPickupTasks.delete(task.backupId);
+                updateRowDownloadButton(task.backupId);
+              } else if (progress.status === 'FAILED') {
+                rowPickupTasks.delete(task.backupId);
+                setError(progress.error || 'Download failed');
+                updateRowDownloadButton(task.backupId);
+              }
+            }
+          } catch (e) {
+            if (task.kind === 'latest') {
+              pickupRequestInFlight = false;
+              latestPickupTask = null;
+              syncActionButtons();
+            }
+            if (task.kind === 'row') {
+              rowPickupTasks.delete(task.backupId);
+              updateRowDownloadButton(task.backupId);
+            }
+          }
+        }
+      }, 350);
     }
 
     function updateSortHeaderUi() {
@@ -857,7 +1011,7 @@
       } catch (e) {
         backupsCache = [];
         const tbody = document.getElementById('backupsBody');
-        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Connect to a server to view archives.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Connect to a server to view archives.</td></tr>';
       }
     }
 
@@ -966,14 +1120,43 @@
       }
       setError();
       pickupRequestInFlight = true;
+      latestPickupTask = { taskId: null, backupId: null, bytesWritten: 0, totalBytes: 0 };
       syncActionButtons();
       try {
-        await request('/api/client/pickup', { method: 'POST' });
-        await refreshBackups();
+        const started = await request('/api/client/pickup', { method: 'POST' });
+        latestPickupTask = {
+          taskId: started.taskId,
+          backupId: started.backupId,
+          bytesWritten: 0,
+          totalBytes: started.totalBytes || 0
+        };
+        startPickupTaskPolling();
       } catch (e) { setError(e.message); }
       finally {
-        pickupRequestInFlight = false;
-        syncActionButtons();
+        if (!latestPickupTask || !latestPickupTask.taskId) {
+          pickupRequestInFlight = false;
+          latestPickupTask = null;
+          syncActionButtons();
+        }
+      }
+    }
+
+    async function pickupBackupById(id) {
+      setError();
+      if (rowPickupTasks.has(id)) {
+        return;
+      }
+      try {
+        const started = await request(`/api/client/pickup/${encodeURIComponent(id)}`, { method: 'POST' });
+        rowPickupTasks.set(id, {
+          taskId: started.taskId,
+          bytesWritten: 0,
+          totalBytes: started.totalBytes || 0
+        });
+        updateRowDownloadButton(id);
+        startPickupTaskPolling();
+      } catch (e) {
+        setError(e.message);
       }
     }
 

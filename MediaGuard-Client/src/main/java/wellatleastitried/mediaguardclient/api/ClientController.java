@@ -1,11 +1,11 @@
 package wellatleastitried.mediaguardclient.api;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,6 +21,8 @@ import wellatleastitried.mediaguardclient.dto.BackupDto;
 import wellatleastitried.mediaguardclient.dto.ClientStatusDto;
 import wellatleastitried.mediaguardclient.dto.ConnectionStatusDto;
 import wellatleastitried.mediaguardclient.dto.IntervalUpdateRequest;
+import wellatleastitried.mediaguardclient.dto.PickupProgressDto;
+import wellatleastitried.mediaguardclient.dto.PickupStartDto;
 import wellatleastitried.mediaguardclient.dto.ServerSelectionRequest;
 import wellatleastitried.mediaguardclient.dto.ServerStatusDto;
 import wellatleastitried.mediaguardclient.service.BackupPickupService;
@@ -61,7 +63,7 @@ public class ClientController {
         if (activeServer == null || activeServer.isBlank()) {
             String preferredIp = configuration.getPreferredServerIp();
             if (preferredIp != null && !preferredIp.isBlank()) {
-                LOGGER.info("No active server — probing preferred IP: {}", preferredIp);
+                LOGGER.info("No active server, probing preferred IP: {}", preferredIp);
                 discoveryService.resolveServerByIp(preferredIp).ifPresent(url -> {
                     LOGGER.info("Auto-resolved server from preferred IP: {}", url);
                     stateService.setActiveServer(url);
@@ -80,9 +82,9 @@ public class ClientController {
 
     @PostMapping("/discover")
     public ClientStatusDto discover() {
-        LOGGER.info("POST /api/client/discover — starting network scan");
+        LOGGER.info("POST /api/client/discover, starting network scan");
         List<String> discovered = discoveryService.discover();
-        LOGGER.info("Discovery complete — found {} server(s): {}", discovered.size(), discovered);
+        LOGGER.info("Discovery complete, found {} server(s): {}", discovered.size(), discovered);
         stateService.updateKnownServers(discovered);
         return status();
     }
@@ -101,14 +103,14 @@ public class ClientController {
             LOGGER.info("server-health: {} is reachable", activeServer);
             return new ConnectionStatusDto(activeServer, true, serverStatus);
         } catch (RuntimeException ex) {
-            LOGGER.warn("server-health: {} is unreachable — {}", activeServer, ex.getMessage());
+            LOGGER.warn("server-health: {} is unreachable: {}", activeServer, ex.getMessage());
             return new ConnectionStatusDto(activeServer, false);
         }
     }
 
     @PutMapping("/server")
     public ClientStatusDto setServer(@RequestBody ServerSelectionRequest request) {
-        LOGGER.info("PUT /api/client/server — request={}", request);
+        LOGGER.info("PUT /api/client/server, request={}", request);
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
         }
@@ -144,7 +146,7 @@ public class ClientController {
     @GetMapping("/backups")
     public List<BackupDto> listBackups() {
         String activeServer = requireActiveServer();
-        LOGGER.info("GET /api/client/backups — forwarding to {}", activeServer);
+        LOGGER.info("GET /api/client/backups, forwarding to {}", activeServer);
         List<BackupDto> backups = serverApiService.listBackups(activeServer);
         LOGGER.info("Received {} backup(s) from server", backups.size());
         return backups;
@@ -153,22 +155,39 @@ public class ClientController {
     @PostMapping("/backups/run")
     public void runBackup() {
         String activeServer = requireActiveServer();
-        LOGGER.info("POST /api/client/backups/run — triggering backup on {}", activeServer);
+        LOGGER.info("POST /api/client/backups/run, triggering backup on {}", activeServer);
         serverApiService.triggerBackup(activeServer);
         LOGGER.info("Backup triggered successfully on {}", activeServer);
     }
 
     @PostMapping("/pickup")
-    public String pickupNow() {
-        LOGGER.info("POST /api/client/pickup — manual pickup requested");
-        Path file = pickupService.pickupLatest();
-        LOGGER.info("Pickup complete — saved to: {}", file);
-        return file.toString();
+    public PickupStartDto pickupNow() {
+        LOGGER.info("POST /api/client/pickup, manual pickup requested");
+        PickupStartDto task = pickupService.startPickupLatestTask();
+        LOGGER.info("Pickup task started: {}", task.taskId());
+        return task;
+    }
+
+    @PostMapping("/pickup/{id}")
+    public PickupStartDto pickupById(@PathVariable String id) {
+        LOGGER.info("POST /api/client/pickup/{}, manual pickup by id requested", id);
+        PickupStartDto task = pickupService.startPickupByIdTask(id);
+        LOGGER.info("Pickup-by-id task started: {} for {}", task.taskId(), id);
+        return task;
+    }
+
+    @GetMapping("/pickup/progress/{taskId}")
+    public PickupProgressDto pickupProgress(@PathVariable String taskId) {
+        LOGGER.debug("GET /api/client/pickup/progress/{}", taskId);
+        PickupProgressDto progress = pickupService.pickupProgress(taskId);
+        LOGGER.debug("Pickup progress returned: taskId={}, status={}, bytesWritten={}, totalBytes={}",
+            taskId, progress.status(), progress.bytesWritten(), progress.totalBytes());
+        return progress;
     }
 
     @PutMapping("/pickup-interval")
     public ClientStatusDto updatePickupInterval(@RequestBody IntervalUpdateRequest request) {
-        LOGGER.info("PUT /api/client/pickup-interval — requested={}", request.interval());
+        LOGGER.info("PUT /api/client/pickup-interval, requested={}", request.interval());
         Duration duration = pickupService.updatePickupInterval(request.interval());
         LOGGER.info("Pickup interval updated to: {}", duration);
         return new ClientStatusDto(
@@ -181,7 +200,7 @@ public class ClientController {
     @PutMapping("/server-schedule")
     public void updateServerSchedule(@RequestBody IntervalUpdateRequest request) {
         String activeServer = requireActiveServer();
-        LOGGER.info("PUT /api/client/server-schedule — interval={}, target={}", request.interval(), activeServer);
+        LOGGER.info("PUT /api/client/server-schedule, interval={}, target={}", request.interval(), activeServer);
         serverApiService.updateServerSchedule(activeServer, request.interval());
         LOGGER.info("Server schedule updated on {}", activeServer);
     }
@@ -189,7 +208,7 @@ public class ClientController {
     private String requireActiveServer() {
         String activeServer = stateService.getActiveServer();
         if (activeServer == null || activeServer.isBlank()) {
-            LOGGER.warn("Request rejected — no active server configured");
+            LOGGER.warn("Request rejected: no active server configured");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active MediaGuard server selected");
         }
         return activeServer;

@@ -29,7 +29,7 @@ public class RunnerFactory {
         for (Map.Entry<String, ServiceConfig> entry : serviceConfigMap.entrySet()) {
             ServiceConfig config = entry.getValue();
             if (config == null || !config.isEnabled()) {
-                LOGGER.debug("Service '{}' is disabled or unconfigured — skipping", entry.getKey());
+                LOGGER.debug("Service '{}' is disabled or unconfigured, skipping", entry.getKey());
                 continue;
             }
 
@@ -43,7 +43,7 @@ public class RunnerFactory {
                 case "prowlarr" -> { runners.add(new ProwlarrRunner(config)); LOGGER.info("Registered runner: prowlarr"); }
                 case "tdarr" -> { runners.add(new TdarrRunner(config)); LOGGER.info("Registered runner: tdarr"); }
                 case "qbittorrent" -> { runners.add(new QBittorrentRunner(config)); LOGGER.info("Registered runner: qbittorrent"); }
-                default -> LOGGER.warn("Unknown service key '{}' — no runner registered", key);
+                default -> LOGGER.warn("Unknown service key '{}', no runner registered", key);
             }
         }
 

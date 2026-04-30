@@ -58,7 +58,7 @@ public class ServerDiscoveryService {
         List<String> prefixes = localPrefixes();
         Set<String> discovered = new java.util.LinkedHashSet<>();
 
-        LOGGER.info("Starting network discovery — localPrefixes={}", prefixes);
+        LOGGER.info("Starting network discovery: localPrefixes={}", prefixes);
 
         String preferredServerIp = configuration.getPreferredServerIp();
         if (preferredServerIp != null && !preferredServerIp.isBlank()) {
@@ -70,12 +70,12 @@ public class ServerDiscoveryService {
         }
 
         if (prefixes.isEmpty()) {
-            LOGGER.warn("No local network prefixes detected — skipping subnet scan");
+            LOGGER.warn("No local network prefixes detected, skipping subnet scan");
             return discovered.stream().toList();
         }
 
         List<Integer> portsToProbe = discoveryPorts();
-        LOGGER.info("Scanning {} subnet prefix(es) with {} port(s) each — ports={}", prefixes.size(), portsToProbe.size(), portsToProbe);
+        LOGGER.info("Scanning {} subnet prefix(es) with {} port(s) each, ports={}", prefixes.size(), portsToProbe.size(), portsToProbe);
         Set<String> candidates = new java.util.LinkedHashSet<>();
         for (String prefix : prefixes) {
             for (int host = 1; host <= 254; host++) {
@@ -113,7 +113,7 @@ public class ServerDiscoveryService {
             executor.shutdownNow();
         }
 
-        LOGGER.info("Network discovery complete — found {} server(s): {}", discovered.size(), discovered);
+        LOGGER.info("Network discovery complete, found {} server(s): {}", discovered.size(), discovered);
         return discovered.stream().toList();
     }
 
@@ -161,7 +161,7 @@ public class ServerDiscoveryService {
             return Optional.of(defaultCandidate);
         }
 
-        LOGGER.debug("Default port {} not responding — trying common ports", defaultPort);
+        LOGGER.debug("Default port {} not responding, trying common ports", defaultPort);
         for (Integer quickPort : discoveryPorts()) {
             if (quickPort == defaultPort) {
                 continue;
@@ -177,7 +177,7 @@ public class ServerDiscoveryService {
             }
         }
 
-        LOGGER.info("Common ports exhausted for {} — starting full port scan ({}-{})", host, MIN_NON_STANDARD_PORT, MAX_PORT);
+        LOGGER.info("Common ports exhausted for {}, starting full port scan ({}-{})", host, MIN_NON_STANDARD_PORT, MAX_PORT);
         ExecutorService executor = Executors.newFixedThreadPool(PORT_SCAN_THREADS);
         AtomicBoolean stop = new AtomicBoolean(false);
         try {
@@ -213,7 +213,7 @@ public class ServerDiscoveryService {
                     return Optional.of(candidate);
                 }
             }
-            LOGGER.warn("Full port scan exhausted for {} — no server found", host);
+            LOGGER.warn("Full port scan exhausted for {}, no server found", host);
             return Optional.empty();
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();

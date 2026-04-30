@@ -21,11 +21,10 @@ public class ClientStateService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientStateService.class);
 
-    /** JSON-serializable state snapshot — kept flat and simple for stability. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     private static class ClientState {
         public String activeServer = "";
-        public long pickupIntervalSeconds = 43200; // 12h default
+        public long pickupIntervalSeconds = 43_200;
         public List<String> knownServers = new ArrayList<>();
     }
 
@@ -41,7 +40,7 @@ public class ClientStateService {
         this.pickupInterval = safe(configuration.getPickupInterval());
         this.activeServer = null;
         load();
-        LOGGER.info("ClientStateService initialized — activeServer={}, pickupInterval={}, knownServers={}",
+        LOGGER.info("ClientStateService initialized: activeServer={}, pickupInterval={}, knownServers={}",
             activeServer, pickupInterval, knownServers);
     }
 
@@ -87,7 +86,7 @@ public class ClientStateService {
     private void load() {
         Path path = statePath();
         if (!Files.exists(path)) {
-            LOGGER.info("No state file found at {} — starting fresh", path);
+            LOGGER.info("No state file found at {}, starting fresh", path);
             return;
         }
         try {
@@ -99,10 +98,10 @@ public class ClientStateService {
             if ((activeServer == null || activeServer.isBlank()) && !knownServers.isEmpty()) {
                 activeServer = knownServers.getFirst();
             }
-            LOGGER.info("State loaded from {} — activeServer={}, pickupInterval={}, knownServers={}",
+            LOGGER.info("State loaded from {}: activeServer={}, pickupInterval={}, knownServers={}",
                 path, activeServer, pickupInterval, knownServers);
         } catch (IOException e) {
-            LOGGER.warn("Failed to load state from {} — starting with defaults", path, e);
+            LOGGER.warn("Failed to load state from {}, starting with defaults", path, e);
         }
     }
 
@@ -115,6 +114,7 @@ public class ClientStateService {
             state.pickupIntervalSeconds = pickupInterval.toSeconds();
             state.knownServers = List.copyOf(knownServers);
             mapper.writerWithDefaultPrettyPrinter().writeValue(path.toFile(), state);
+            LOGGER.debug("Client state persisted to {}", path);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to persist client state", e);
         }

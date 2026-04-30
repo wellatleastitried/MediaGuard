@@ -22,7 +22,7 @@ public class BackupScheduleService {
         Duration interval = safe(properties.getBackupInterval());
         this.currentInterval = new AtomicReference<>(interval);
         this.nextRun = new AtomicReference<>(Instant.now().plus(interval));
-        LOGGER.info("Backup schedule initialized — interval={}, firstRunAt={}", interval, nextRun.get());
+        LOGGER.info("Backup schedule initialized: interval={}, firstRunAt={}", interval, nextRun.get());
     }
 
     public Duration getInterval() {
@@ -38,7 +38,7 @@ public class BackupScheduleService {
         currentInterval.set(safe);
         Instant next = Instant.now().plus(safe);
         nextRun.set(next);
-        LOGGER.info("Backup interval updated — newInterval={}, nextRunAt={}", safe, next);
+        LOGGER.info("Backup interval updated: newInterval={}, nextRunAt={}", safe, next);
         return safe;
     }
 
@@ -51,7 +51,7 @@ public class BackupScheduleService {
     public void markRunStarted() {
         Instant next = Instant.now().plus(currentInterval.get());
         nextRun.set(next);
-        LOGGER.info("Backup run started — nextScheduledRun={}", next);
+        LOGGER.info("Backup run started: nextScheduledRun={}", next);
     }
 
     private Duration safe(Duration interval) {

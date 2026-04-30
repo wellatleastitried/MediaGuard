@@ -39,7 +39,7 @@ public abstract class AbstractLocalCopyRunner implements Runner {
         }
 
         List<CopySpec> specs = copySpecs();
-        LOGGER.info("[{}] Starting copy — {} spec(s) to {}", serviceName, specs.size(), serviceDirectory);
+        LOGGER.info("[{}] Starting copy: {} spec(s) to {}", serviceName, specs.size(), serviceDirectory);
         int succeeded = 0;
         for (CopySpec spec : specs) {
             try {
@@ -49,7 +49,7 @@ public abstract class AbstractLocalCopyRunner implements Runner {
                 LOGGER.warn("[{}] Failed spec '{}' (source={}). Continuing.", serviceName, spec.targetName(), spec.sourcePath(), ex);
             }
         }
-        LOGGER.info("[{}] Copy complete — {}/{} specs succeeded", serviceName, succeeded, specs.size());
+        LOGGER.info("[{}] Copy complete: {}/{} specs succeeded", serviceName, succeeded, specs.size());
     }
 
     protected abstract List<CopySpec> copySpecs();
