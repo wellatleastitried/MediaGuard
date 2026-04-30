@@ -74,37 +74,76 @@ if [[ "$setup_server" == "true" ]]; then
   prompt backup_retention "Maximum number of backups to keep [10]: " "10"
 
   yes_no jellyfin_enabled "Enable Jellyfin backups? [Y/n]: " "y"
-  prompt jellyfin_path "Jellyfin source base directory [/mnt/appdata/jellyfin]: " "/mnt/appdata/jellyfin"
+  if [[ "$jellyfin_enabled" == "true" ]]; then
+    prompt jellyfin_path "Jellyfin source base directory [/mnt/appdata/jellyfin]: " "/mnt/appdata/jellyfin"
+  else
+    jellyfin_path=""
+  fi
 
   yes_no radarr_enabled "Enable Radarr backups? [Y/n]: " "y"
-  prompt radarr_path "Radarr source base directory [/mnt/appdata/radarr]: " "/mnt/appdata/radarr"
+  if [[ "$radarr_enabled" == "true" ]]; then
+    prompt radarr_path "Radarr source base directory [/mnt/appdata/radarr]: " "/mnt/appdata/radarr"
+  else
+    radarr_path=""
+  fi
 
   yes_no sonarr_enabled "Enable Sonarr backups? [Y/n]: " "y"
-  prompt sonarr_path "Sonarr source base directory [/mnt/appdata/sonarr]: " "/mnt/appdata/sonarr"
+  if [[ "$sonarr_enabled" == "true" ]]; then
+    prompt sonarr_path "Sonarr source base directory [/mnt/appdata/sonarr]: " "/mnt/appdata/sonarr"
+  else
+    sonarr_path=""
+  fi
 
   yes_no prowlarr_enabled "Enable Prowlarr backups? [Y/n]: " "y"
-  prompt prowlarr_path "Prowlarr source base directory [/mnt/appdata/prowlarr]: " "/mnt/appdata/prowlarr"
+  if [[ "$prowlarr_enabled" == "true" ]]; then
+    prompt prowlarr_path "Prowlarr source base directory [/mnt/appdata/prowlarr]: " "/mnt/appdata/prowlarr"
+  else
+    prowlarr_path=""
+  fi
 
   yes_no tdarr_enabled "Enable Tdarr backups? [Y/n]: " "y"
-  prompt tdarr_path "Tdarr source base directory [/mnt/appdata/tdarr]: " "/mnt/appdata/tdarr"
+  if [[ "$tdarr_enabled" == "true" ]]; then
+    prompt tdarr_path "Tdarr source base directory [/mnt/appdata/tdarr]: " "/mnt/appdata/tdarr"
+  else
+    tdarr_path=""
+  fi
 
   yes_no qbittorrent_enabled "Enable qBittorrent backups? [Y/n]: " "y"
-  prompt qbittorrent_path "qBittorrent source base directory [/mnt/appdata/qbittorrent]: " "/mnt/appdata/qbittorrent"
-  prompt qbittorrent_graveyard_path "qBittorrent graveyard source directory [/mnt/media/graveyard]: " "/mnt/media/graveyard"
+  if [[ "$qbittorrent_enabled" == "true" ]]; then
+    prompt qbittorrent_path "qBittorrent source base directory [/mnt/appdata/qbittorrent]: " "/mnt/appdata/qbittorrent"
+    prompt qbittorrent_graveyard_path "qBittorrent graveyard source directory [/mnt/media/graveyard]: " "/mnt/media/graveyard"
+  else
+    qbittorrent_path=""
+    qbittorrent_graveyard_path=""
+  fi
 
-  cat > "$ENV_FILE" <<EOF_ENV
+  {
+    cat <<EOF_ENV
 SERVER_PORT=$server_port
 MEDIAGUARD_BACKUP_INTERVAL=$backup_interval
 BACKUP_ROOT_HOST_PATH=$backup_root_host
 MEDIAGUARD_RETENTION_COUNT=$backup_retention
-JELLYFIN_PATH=$jellyfin_path
-RADARR_PATH=$radarr_path
-SONARR_PATH=$sonarr_path
-PROWLARR_PATH=$prowlarr_path
-TDARR_PATH=$tdarr_path
-QBITTORRENT_PATH=$qbittorrent_path
-QBITTORRENT_GRAVEYARD_PATH=$qbittorrent_graveyard_path
 EOF_ENV
+    if [[ "$jellyfin_enabled" == "true" ]]; then
+      echo "JELLYFIN_PATH=$jellyfin_path"
+    fi
+    if [[ "$radarr_enabled" == "true" ]]; then
+      echo "RADARR_PATH=$radarr_path"
+    fi
+    if [[ "$sonarr_enabled" == "true" ]]; then
+      echo "SONARR_PATH=$sonarr_path"
+    fi
+    if [[ "$prowlarr_enabled" == "true" ]]; then
+      echo "PROWLARR_PATH=$prowlarr_path"
+    fi
+    if [[ "$tdarr_enabled" == "true" ]]; then
+      echo "TDARR_PATH=$tdarr_path"
+    fi
+    if [[ "$qbittorrent_enabled" == "true" ]]; then
+      echo "QBITTORRENT_PATH=$qbittorrent_path"
+      echo "QBITTORRENT_GRAVEYARD_PATH=$qbittorrent_graveyard_path"
+    fi
+  } > "$ENV_FILE"
 
   cat > "$SERVER_ENV_FILE" <<EOF_SERVER
 SERVER_PORT=$server_port
@@ -121,7 +160,8 @@ EOF_SERVER
 
   rm -f "$CLIENT_ENV_FILE"
 
-  cat > "$COMPOSE_FILE" <<EOF_COMPOSE
+  {
+    cat <<EOF_COMPOSE
 services:
   mediaguard-server:
     build:
@@ -134,15 +174,28 @@ services:
       - "$server_port:$server_port"
     volumes:
       - "$backup_root_host:/var/lib/mediaguard/backups"
-      - "$jellyfin_path:/srv/sources/jellyfin:ro"
-      - "$radarr_path:/srv/sources/radarr:ro"
-      - "$sonarr_path:/srv/sources/sonarr:ro"
-      - "$prowlarr_path:/srv/sources/prowlarr:ro"
-      - "$tdarr_path:/srv/sources/tdarr:ro"
-      - "$qbittorrent_path:/srv/sources/qbittorrent:ro"
-      - "$qbittorrent_graveyard_path:/srv/sources/qbittorrent-graveyard:ro"
-    restart: unless-stopped
 EOF_COMPOSE
+    if [[ "$jellyfin_enabled" == "true" ]]; then
+      echo "      - \"$jellyfin_path:/srv/sources/jellyfin:ro\""
+    fi
+    if [[ "$radarr_enabled" == "true" ]]; then
+      echo "      - \"$radarr_path:/srv/sources/radarr:ro\""
+    fi
+    if [[ "$sonarr_enabled" == "true" ]]; then
+      echo "      - \"$sonarr_path:/srv/sources/sonarr:ro\""
+    fi
+    if [[ "$prowlarr_enabled" == "true" ]]; then
+      echo "      - \"$prowlarr_path:/srv/sources/prowlarr:ro\""
+    fi
+    if [[ "$tdarr_enabled" == "true" ]]; then
+      echo "      - \"$tdarr_path:/srv/sources/tdarr:ro\""
+    fi
+    if [[ "$qbittorrent_enabled" == "true" ]]; then
+      echo "      - \"$qbittorrent_path:/srv/sources/qbittorrent:ro\""
+      echo "      - \"$qbittorrent_graveyard_path:/srv/sources/qbittorrent-graveyard:ro\""
+    fi
+    echo "    restart: unless-stopped"
+  } > "$COMPOSE_FILE"
 
   echo ""
   echo "Created: $COMPOSE_FILE"

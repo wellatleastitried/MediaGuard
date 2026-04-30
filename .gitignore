@@ -12,7 +12,8 @@ gradle/
 secrets/
 .env
 .env.*
-!.env.example
+.env.example
 .env.test.example
 data/
 docker-compose.yml
+docker-compose.example.yml
