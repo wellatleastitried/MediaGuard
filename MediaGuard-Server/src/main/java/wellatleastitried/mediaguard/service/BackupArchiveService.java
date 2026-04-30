@@ -14,6 +14,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -33,8 +35,11 @@ public class BackupArchiveService {
 
     private static final DateTimeFormatter FILE_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS")
         .withZone(ZoneOffset.UTC);
+    private static final long ARCHIVE_CACHE_TTL_MS = 60_000;  // Cache archive list for 60 seconds
 
     private final MediaGuardProperties properties;
+    private final AtomicReference<List<BackupArchive>> cachedArchives = new AtomicReference<>(null);
+    private final AtomicLong cacheLastUpdatedMs = new AtomicLong(0);
 
     public BackupArchiveService(MediaGuardProperties properties) {
         this.properties = properties;
@@ -103,6 +108,11 @@ public class BackupArchiveService {
             enforceRetention();
             long size = Files.size(archivePath);
             LOGGER.info("Archive created: {} ({} bytes)", fileName, size);
+            
+            // Invalidate cache after new archive created
+            cacheLastUpdatedMs.set(0);
+            cachedArchives.set(null);
+            
             return new BackupArchive(toId(fileName), fileName, archivePath, size, createdAt);
         } catch (IOException e) {
             LOGGER.error("Failed to create backup archive: {}", fileName, e);
@@ -111,19 +121,40 @@ public class BackupArchiveService {
     }
 
     public List<BackupArchive> listArchives() {
+        long now = System.currentTimeMillis();
+        long lastUpdate = cacheLastUpdatedMs.get();
+        
+        // Return cached result if cache is fresh
+        if (now - lastUpdate < ARCHIVE_CACHE_TTL_MS) {
+            List<BackupArchive> cached = cachedArchives.get();
+            if (cached != null) {
+                LOGGER.debug("Returning cached archive list ({}ms old)", now - lastUpdate);
+                return cached;
+            }
+        }
+        
+        // Cache miss or expired, rebuild list
         Path root = rootDirectory();
+        List<BackupArchive> archives;
         if (!Files.exists(root)) {
-            return List.of();
+            archives = List.of();
+        } else {
+            try (var stream = Files.list(root)) {
+                archives = stream
+                    .filter(path -> path.getFileName().toString().endsWith(".zip"))
+                    .sorted(Comparator.comparing(this::lastModified).reversed())
+                    .map(this::toArchive)
+                    .toList();
+            } catch (IOException e) {
+                throw new IllegalStateException("Failed to list archives", e);
+            }
         }
-        try (var stream = Files.list(root)) {
-            return stream
-                .filter(path -> path.getFileName().toString().endsWith(".zip"))
-                .sorted(Comparator.comparing(this::lastModified).reversed())
-                .map(this::toArchive)
-                .toList();
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to list archives", e);
-        }
+        
+        // Update cache
+        cachedArchives.set(archives);
+        cacheLastUpdatedMs.set(now);
+        LOGGER.debug("Rebuilt archive cache with {} archives", archives.size());
+        return archives;
     }
 
     public Optional<BackupArchive> latest() {
@@ -143,6 +174,11 @@ public class BackupArchiveService {
         try {
             Files.deleteIfExists(archive.get().path());
             LOGGER.info("Archive deleted: {}", id);
+            
+            // Invalidate cache after deletion
+            cacheLastUpdatedMs.set(0);
+            cachedArchives.set(null);
+            
             return true;
         } catch (IOException e) {
             LOGGER.error("Failed to delete archive: {}", id, e);
