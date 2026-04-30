@@ -34,18 +34,22 @@ public abstract class AbstractLocalCopyRunner implements Runner {
         Path serviceDirectory = outputDirectory.resolve(serviceName.toLowerCase(Locale.ROOT));
         try {
             Files.createDirectories(serviceDirectory);
-            LOGGER.info("{} runner found directory: {}", serviceName, serviceDirectory);
         } catch (IOException e) {
             throw new IllegalStateException("Unable to create output directory for " + serviceName, e);
         }
 
-        for (CopySpec spec : copySpecs()) {
+        List<CopySpec> specs = copySpecs();
+        LOGGER.info("[{}] Starting copy — {} spec(s) to {}", serviceName, specs.size(), serviceDirectory);
+        int succeeded = 0;
+        for (CopySpec spec : specs) {
             try {
                 copySpec(spec, serviceDirectory);
+                succeeded++;
             } catch (RuntimeException ex) {
-                LOGGER.warn("{} runner failed for {} source {}. Continuing with remaining specs.", serviceName, spec.targetName(), spec.sourcePath(), ex);
+                LOGGER.warn("[{}] Failed spec '{}' (source={}). Continuing.", serviceName, spec.targetName(), spec.sourcePath(), ex);
             }
         }
+        LOGGER.info("[{}] Copy complete — {}/{} specs succeeded", serviceName, succeeded, specs.size());
     }
 
     protected abstract List<CopySpec> copySpecs();
@@ -85,7 +89,7 @@ public abstract class AbstractLocalCopyRunner implements Runner {
                     Files.createDirectories(parent);
                 }
                 Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                LOGGER.info("{} runner found file: {}", serviceName, target);
+                LOGGER.debug("[{}] Copied file: {}", serviceName, target);
             }
         } catch (IOException e) {
             throw new IllegalStateException(serviceName + " runner failed while copying " + source, e);
@@ -100,7 +104,7 @@ public abstract class AbstractLocalCopyRunner implements Runner {
                 Path relative = source.relativize(dir);
                 Path destination = target.resolve(relative);
                 Files.createDirectories(destination);
-                LOGGER.info("{} runner found directory: {}", serviceName, destination);
+                LOGGER.debug("[{}] Created dir: {}", serviceName, destination);
                 return FileVisitResult.CONTINUE;
             }
 
@@ -113,13 +117,13 @@ public abstract class AbstractLocalCopyRunner implements Runner {
                     Files.createDirectories(parent);
                 }
                 Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
-                LOGGER.info("{} runner found file: {}", serviceName, destination);
+                LOGGER.debug("[{}] Copied: {}", serviceName, destination);
                 return FileVisitResult.CONTINUE;
             }
 
             @Override
             public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                LOGGER.warn("{} runner failed to read {}. Continuing.", serviceName, file, exc);
+                LOGGER.warn("[{}] Failed to read: {}. Continuing.", serviceName, file, exc);
                 return FileVisitResult.CONTINUE;
             }
         };

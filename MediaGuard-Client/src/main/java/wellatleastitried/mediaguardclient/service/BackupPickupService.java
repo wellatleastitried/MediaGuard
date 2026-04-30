@@ -8,11 +8,15 @@ import java.time.format.DateTimeFormatter;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import wellatleastitried.mediaguardclient.Configuration;
 
 @Service
 public class BackupPickupService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(BackupPickupService.class);
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
@@ -38,18 +42,27 @@ public class BackupPickupService {
         if (now.isBefore(nextPickup)) {
             return;
         }
-        pickupLatest();
+        LOGGER.info("Scheduled pickup triggered (next after: {})", nextPickup);
+        try {
+            Path result = pickupLatest();
+            LOGGER.info("Scheduled pickup complete: {}", result);
+        } catch (RuntimeException ex) {
+            LOGGER.warn("Scheduled pickup failed", ex);
+        }
         nextPickup = now.plus(clientStateService.getPickupInterval());
+        LOGGER.info("Next pickup scheduled at: {}", nextPickup);
     }
 
     public Path pickupLatest() {
         String activeServer = clientStateService.getActiveServer();
         if (activeServer == null || activeServer.isBlank()) {
+            LOGGER.error("Pickup requested but no active server is configured");
             throw new IllegalStateException("No active server selected");
         }
 
         String fileName = DATE_FORMAT.format(Instant.now()) + "-media-backup.zip";
         Path destination = Path.of(configuration.getDownloadDirectory()).toAbsolutePath().normalize().resolve(fileName);
+        LOGGER.info("Downloading latest backup from {} to {}", activeServer, destination);
         return serverApiService.downloadLatest(activeServer, destination);
     }
 

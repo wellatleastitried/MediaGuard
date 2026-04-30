@@ -18,12 +18,16 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import wellatleastitried.mediaguard.MediaGuardProperties;
 import wellatleastitried.mediaguard.model.BackupArchive;
 
 @Service
 public class BackupArchiveService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(BackupArchiveService.class);
 
     private static final DateTimeFormatter FILE_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS")
         .withZone(ZoneOffset.UTC);
@@ -44,13 +48,16 @@ public class BackupArchiveService {
         Path root = rootDirectory();
         Path archivePath = root.resolve(fileName);
 
+        LOGGER.info("Creating backup archive: {} from runDir={}", fileName, runDirectory);
         try {
             Files.createDirectories(root);
             zipDirectory(runDirectory, archivePath);
             enforceRetention();
             long size = Files.size(archivePath);
+            LOGGER.info("Archive created: {} ({} bytes)", fileName, size);
             return new BackupArchive(toId(fileName), fileName, archivePath, size, createdAt);
         } catch (IOException e) {
+            LOGGER.error("Failed to create backup archive: {}", fileName, e);
             throw new IllegalStateException("Failed to create backup archive", e);
         }
     }
@@ -60,8 +67,8 @@ public class BackupArchiveService {
         if (!Files.exists(root)) {
             return List.of();
         }
-        try {
-            return Files.list(root)
+        try (var stream = Files.list(root)) {
+            return stream
                 .filter(path -> path.getFileName().toString().endsWith(".zip"))
                 .sorted(Comparator.comparing(this::lastModified).reversed())
                 .map(this::toArchive)
@@ -87,8 +94,10 @@ public class BackupArchiveService {
 
         try {
             Files.deleteIfExists(archive.get().path());
+            LOGGER.info("Archive deleted: {}", id);
             return true;
         } catch (IOException e) {
+            LOGGER.error("Failed to delete archive: {}", id, e);
             throw new IllegalStateException("Failed to delete archive " + id, e);
         }
     }
@@ -123,13 +132,17 @@ public class BackupArchiveService {
 
     private void enforceRetention() throws IOException {
         int retain = Math.max(1, properties.getRetentionCount());
-        List<Path> archives = Files.list(rootDirectory())
-            .filter(path -> path.getFileName().toString().endsWith(".zip"))
-            .sorted(Comparator.comparing(this::lastModified).reversed())
-            .toList();
-
+        List<Path> archives;
+        try (var stream = Files.list(rootDirectory())) {
+            archives = stream
+                .filter(path -> path.getFileName().toString().endsWith(".zip"))
+                .sorted(Comparator.comparing(this::lastModified).reversed())
+                .toList();
+        }
         for (int i = retain; i < archives.size(); i++) {
-            Files.deleteIfExists(archives.get(i));
+            Path toDelete = archives.get(i);
+            LOGGER.info("Retention: deleting old archive: {}", toDelete.getFileName());
+            Files.deleteIfExists(toDelete);
         }
     }
 

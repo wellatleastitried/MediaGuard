@@ -1,4 +1,4 @@
 package wellatleastitried.mediaguardclient.dto;
 
-public record ServerSelectionRequest(String serverUrl, String serverIp) {
+public record ServerSelectionRequest(String serverUrl, String serverIp, Integer serverPort) {
 }
