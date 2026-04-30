@@ -123,8 +123,8 @@ EOF_SERVER
 services:
   mediaguard-server:
     build:
-      context: .
-      dockerfile: MediaGuard-Server/Dockerfile
+      context: ./MediaGuard-Server
+      dockerfile: Dockerfile
     container_name: mediaguard-server
     env_file:
       - ./secrets/server.env
@@ -154,7 +154,7 @@ EOF_COMPOSE
 else
   prompt client_port "MediaGuard-Client host port [8081]: " "8081"
   prompt pickup_interval "Client automatic pickup interval in ISO-8601 format [PT12H]: " "PT12H"
-  prompt server_host "MediaGuard-Server IP/hostname [mediaguard-server]: " "mediaguard-server"
+  prompt server_ip "MediaGuard-Server IP [192.168.1.10]: " "192.168.1.10"
   prompt client_downloads_host "Client download host path [./data/client/downloads]: " "./data/client/downloads"
   prompt client_state_host "Client state host path [./data/client]: " "./data/client"
 
@@ -162,14 +162,14 @@ else
 CLIENT_PORT=$client_port
 CLIENT_PICKUP_INTERVAL=$pickup_interval
 MEDIAGUARD_SERVER_PORT=38471
-MEDIAGUARD_SERVER_HOST=$server_host
+MEDIAGUARD_SERVER_IP=$server_ip
 CLIENT_DOWNLOADS_HOST_PATH=$client_downloads_host
 CLIENT_STATE_HOST_PATH=$client_state_host
 EOF_ENV
 
   cat > "$CLIENT_ENV_FILE" <<EOF_CLIENT
 MEDIAGUARD_SERVER_PORT=38471
-MEDIAGUARD_SERVER_HOST=$server_host
+MEDIAGUARD_SERVER_IP=$server_ip
 CLIENT_PORT=$client_port
 CLIENT_PICKUP_INTERVAL=$pickup_interval
 CLIENT_DOWNLOAD_DIRECTORY=/var/lib/mediaguard/downloads

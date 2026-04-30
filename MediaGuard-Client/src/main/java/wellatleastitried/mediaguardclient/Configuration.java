@@ -11,8 +11,7 @@ public class Configuration {
     private String downloadDirectory = "./data/client/downloads";
     private Duration pickupInterval = Duration.ofHours(12);
     private int serverPort = 8080;
-    private String preferredServerHost = "";
-    private String preferredServerUrl = "";
+    private String preferredServerIp = "";
 
     public String getStateFile() {
         return stateFile;
@@ -46,19 +45,11 @@ public class Configuration {
         this.serverPort = serverPort;
     }
 
-    public String getPreferredServerHost() {
-        return preferredServerHost;
+    public String getPreferredServerIp() {
+        return preferredServerIp;
     }
 
-    public void setPreferredServerHost(String preferredServerHost) {
-        this.preferredServerHost = preferredServerHost;
-    }
-
-    public String getPreferredServerUrl() {
-        return preferredServerUrl;
-    }
-
-    public void setPreferredServerUrl(String preferredServerUrl) {
-        this.preferredServerUrl = preferredServerUrl;
+    public void setPreferredServerIp(String preferredServerIp) {
+        this.preferredServerIp = preferredServerIp;
     }
 }

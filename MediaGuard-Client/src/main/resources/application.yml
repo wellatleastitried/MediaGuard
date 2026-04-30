@@ -7,5 +7,4 @@ mediaguard:
     download-directory: ${CLIENT_DOWNLOAD_DIRECTORY:./data/client/downloads}
     pickup-interval: ${CLIENT_PICKUP_INTERVAL:PT12H}
     server-port: ${MEDIAGUARD_SERVER_PORT:8080}
-    preferred-server-host: ${MEDIAGUARD_SERVER_HOST:}
-    preferred-server-url: ${MEDIAGUARD_SERVER_URL:}
+    preferred-server-ip: ${MEDIAGUARD_SERVER_IP:}

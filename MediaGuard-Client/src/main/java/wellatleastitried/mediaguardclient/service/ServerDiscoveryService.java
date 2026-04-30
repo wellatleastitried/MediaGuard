@@ -54,14 +54,9 @@ public class ServerDiscoveryService {
         }
 
         Set<String> candidates = new java.util.LinkedHashSet<>();
-        String preferredServerUrl = configuration.getPreferredServerUrl();
-        if (preferredServerUrl != null && !preferredServerUrl.isBlank()) {
-            candidates.add(preferredServerUrl.trim());
-        }
-
-        String preferredServerHost = configuration.getPreferredServerHost();
-        if (preferredServerHost != null && !preferredServerHost.isBlank()) {
-            resolveServerByIp(preferredServerHost).ifPresent(candidates::add);
+        String preferredServerIp = configuration.getPreferredServerIp();
+        if (preferredServerIp != null && !preferredServerIp.isBlank()) {
+            resolveServerByIp(preferredServerIp).ifPresent(candidates::add);
         }
 
         for (String prefix : prefixes) {

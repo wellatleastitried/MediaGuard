@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import wellatleastitried.mediaguardclient.Configuration;
 import wellatleastitried.mediaguardclient.dto.BackupDto;
 import wellatleastitried.mediaguardclient.dto.ClientStatusDto;
+import wellatleastitried.mediaguardclient.dto.ConnectionStatusDto;
 import wellatleastitried.mediaguardclient.dto.IntervalUpdateRequest;
 import wellatleastitried.mediaguardclient.dto.ServerSelectionRequest;
 import wellatleastitried.mediaguardclient.service.BackupPickupService;
@@ -51,9 +52,9 @@ public class ClientController {
     public ClientStatusDto status() {
         String activeServer = stateService.getActiveServer();
         if (activeServer == null || activeServer.isBlank()) {
-            String preferredHost = configuration.getPreferredServerHost();
-            if (preferredHost != null && !preferredHost.isBlank()) {
-                discoveryService.resolveServerByIp(preferredHost).ifPresent(stateService::setActiveServer);
+            String preferredIp = configuration.getPreferredServerIp();
+            if (preferredIp != null && !preferredIp.isBlank()) {
+                discoveryService.resolveServerByIp(preferredIp).ifPresent(stateService::setActiveServer);
             }
         }
 
@@ -69,6 +70,21 @@ public class ClientController {
         List<String> discovered = discoveryService.discover();
         stateService.updateKnownServers(discovered);
         return status();
+    }
+
+    @GetMapping("/server-health")
+    public ConnectionStatusDto serverHealth() {
+        String activeServer = stateService.getActiveServer();
+        if (activeServer == null || activeServer.isBlank()) {
+            return new ConnectionStatusDto("", false);
+        }
+
+        try {
+            serverApiService.health(activeServer);
+            return new ConnectionStatusDto(activeServer, true);
+        } catch (RuntimeException ignored) {
+            return new ConnectionStatusDto(activeServer, false);
+        }
     }
 
     @PutMapping("/server")
