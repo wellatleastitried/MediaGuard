@@ -36,11 +36,11 @@ public class BackupOrchestratorService {
     private final BackupScheduleService scheduleService;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ExecutorService runnerExecutor = new ThreadPoolExecutor(
-        1,                           // core threads (always active)
-        6,                           // max threads (number of backup services)
-        30,                          // keep-alive time
-        TimeUnit.SECONDS,            // keep-alive unit (idle threads die after 30s)
-        new LinkedBlockingQueue<>()  // unbounded queue for task submission
+        1, // core threads
+        6, // max threads
+        30, // keep-alive time
+        TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>()
     );
 
     public BackupOrchestratorService(

@@ -108,11 +108,11 @@ public class BackupArchiveService {
             enforceRetention();
             long size = Files.size(archivePath);
             LOGGER.info("Archive created: {} ({} bytes)", fileName, size);
-            
+
             // Invalidate cache after new archive created
             cacheLastUpdatedMs.set(0);
             cachedArchives.set(null);
-            
+
             return new BackupArchive(toId(fileName), fileName, archivePath, size, createdAt);
         } catch (IOException e) {
             LOGGER.error("Failed to create backup archive: {}", fileName, e);
@@ -123,8 +123,7 @@ public class BackupArchiveService {
     public List<BackupArchive> listArchives() {
         long now = System.currentTimeMillis();
         long lastUpdate = cacheLastUpdatedMs.get();
-        
-        // Return cached result if cache is fresh
+
         if (now - lastUpdate < ARCHIVE_CACHE_TTL_MS) {
             List<BackupArchive> cached = cachedArchives.get();
             if (cached != null) {
@@ -132,8 +131,8 @@ public class BackupArchiveService {
                 return cached;
             }
         }
-        
-        // Cache miss or expired, rebuild list
+
+        // Cache miss -> rebuild list
         Path root = rootDirectory();
         List<BackupArchive> archives;
         if (!Files.exists(root)) {
@@ -149,8 +148,7 @@ public class BackupArchiveService {
                 throw new IllegalStateException("Failed to list archives", e);
             }
         }
-        
-        // Update cache
+
         cachedArchives.set(archives);
         cacheLastUpdatedMs.set(now);
         LOGGER.debug("Rebuilt archive cache with {} archives", archives.size());
@@ -174,12 +172,11 @@ public class BackupArchiveService {
         try {
             Files.deleteIfExists(archive.get().path());
             LOGGER.info("Archive deleted: {}", id);
-            
-            // Invalidate cache after deletion
             cacheLastUpdatedMs.set(0);
+
             cachedArchives.set(null);
-            
             return true;
+
         } catch (IOException e) {
             LOGGER.error("Failed to delete archive: {}", id, e);
             throw new IllegalStateException("Failed to delete archive " + id, e);
